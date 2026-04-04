@@ -486,7 +486,6 @@ SFQA/
 
 ## 📞 联系我们
 
-- 📧 邮箱: contact@sfqa.example.com
 - 💬 Issues: [GitHub Issues](https://github.com/e-maker51/SFQA/issues)
 - 🌐 项目主页: https://github.com/e-maker51/SFQA
 
