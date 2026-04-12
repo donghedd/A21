@@ -35,12 +35,12 @@
 
             <div class="detail-row">
               <span class="detail-label">技术名称</span>
-              <span class="detail-value">{{ currentNode.name || '未知技术' }}</span>
+              <span class="detail-value detail-entity-name">{{ currentNode.name || '未知技术' }}</span>
             </div>
 
             <div class="detail-row">
               <span class="detail-label">技术类型</span>
-              <span class="detail-value">{{ currentNode.category || formatNodeType(currentNode.labels) }}</span>
+              <span class="detail-value detail-entity-type">{{ currentNode.category || formatNodeType(currentNode.labels) }}</span>
             </div>
 
             <div class="detail-row">
@@ -242,6 +242,8 @@ function renderChart() {
           show: true,
           position: 'inside',
           color: '#fff',
+          fontSize: BASE_FONT_SIZE * currentZoomScale.value,
+          lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale.value,
           formatter: params => {
             const name = params.data?.name || ''
             return name.length > 4 ? `${name.slice(0, 4)}..` : name
@@ -347,9 +349,16 @@ function applyLabelScale() {
     series: [
       {
         id: 'mainGraph',
+        data: buildChartNodes(),
         label: {
           fontSize: BASE_FONT_SIZE * currentZoomScale.value,
           lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale.value
+        },
+        emphasis: {
+          label: {
+            fontSize: BASE_FONT_SIZE * currentZoomScale.value,
+            lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale.value
+          }
         }
       }
     ]
@@ -616,6 +625,17 @@ onUnmounted(() => {
 
 .detail-value {
   color: #334155;
+}
+
+.detail-entity-name {
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.detail-entity-type {
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .detail-text {
