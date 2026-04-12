@@ -14,7 +14,7 @@ from ..extensions import db
 from ..models import Conversation, Message, CustomModel, KnowledgeBase, ModelKnowledgeBinding
 from .rag_service import get_rag_service
 from .ollama_service import get_ollama_service
-from ..utils.rag_template import get_source_context, format_rag_prompt
+from ..utils.rag_template import format_rag_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -133,13 +133,56 @@ class ChatService:
         if self._ollama_service is None:
             self._ollama_service = get_ollama_service()
         return self._ollama_service
+
+    def _resolve_model_context(self, conversation: Conversation, model: str = None,
+                               custom_model_id: str = None,
+                               external_model_id: str = None) -> Dict[str, Any]:
+        """Resolve which provider/model configuration should be used for a request."""
+        custom_model = None
+        provider = 'ollama'
+        base_model = model or current_app.config.get('OLLAMA_DEFAULT_MODEL', 'qwen3:14b')
+        system_prompt = None
+        effective_custom_model_id = custom_model_id or conversation.custom_model_id
+
+        if conversation.external_model_id is not None:
+            conversation.external_model_id = None
+            db.session.commit()
+
+        if effective_custom_model_id:
+            custom_model = CustomModel.query.get(effective_custom_model_id)
+            if custom_model:
+                provider = 'custom'
+                base_model = custom_model.base_model or base_model
+                system_prompt = custom_model.system_prompt
+                if conversation.custom_model_id != custom_model.id or conversation.external_model_id is not None:
+                    conversation.custom_model_id = custom_model.id
+                    conversation.external_model_id = None
+                    db.session.commit()
+        elif conversation.custom_model_id is not None:
+            conversation.custom_model_id = None
+            db.session.commit()
+
+        return {
+            'provider': provider,
+            'base_model': base_model,
+            'system_prompt': system_prompt,
+            'custom_model': custom_model,
+            'custom_model_id': custom_model.id if custom_model else None,
+            'external_model': None,
+            'external_model_id': None
+        }
+
+    def _stream_response(self, provider: str, base_model: str, messages: List[Dict[str, str]],
+                         external_model: Any = None) -> Generator[Dict[str, Any], None, None]:
+        """Stream response from the selected provider."""
+        yield from self.ollama_service.chat_stream(base_model, messages)
     
     # ==================== Conversation CRUD ====================
     
     def get_conversations(self, user_id: str, search: str = None, 
                           page: int = 1, per_page: int = 20) -> Dict[str, Any]:
         """Get user's conversation list with pagination"""
-        query = Conversation.query.filter_by(user_id=user_id)
+        query = Conversation.query.filter_by(user_id=user_id, deleted_by_user=False)
         
         if search:
             query = query.filter(Conversation.title.ilike(f'%{search}%'))
@@ -173,7 +216,8 @@ class ChatService:
         """Get a conversation by ID"""
         return Conversation.query.filter_by(
             id=conversation_id, 
-            user_id=user_id
+            user_id=user_id,
+            deleted_by_user=False
         ).first()
     
     def update_conversation(self, conversation_id: str, user_id: str,
@@ -192,12 +236,12 @@ class ChatService:
         return conversation
     
     def delete_conversation(self, conversation_id: str, user_id: str) -> bool:
-        """Delete a conversation and all its messages"""
+        """Hide a conversation from the user while keeping records for admin."""
         conversation = self.get_conversation(conversation_id, user_id)
         if not conversation:
             return False
-        
-        db.session.delete(conversation)
+
+        conversation.deleted_by_user = True
         db.session.commit()
         return True
     
@@ -432,7 +476,8 @@ If the context doesn't contain relevant information, answer based on your genera
 
     def chat_stream(self, conversation_id: str, user_id: str, 
                     user_message: str, model: str = None,
-                    custom_model_id: str = None) -> Generator:
+                    custom_model_id: str = None,
+                    external_model_id: str = None) -> Generator:
         """
         Handle chat with streaming response
         Yields SSE formatted events
@@ -444,72 +489,76 @@ If the context doesn't contain relevant information, answer based on your genera
                 yield self._sse_event('error', {'message': 'Conversation not found'})
                 return
             
-            # Resolve custom model settings with priority:
-            # 1. Explicit custom_model_id from request
-            # 2. Conversation's bound custom_model_id
-            # 3. Fall back to model param or default
-            custom_model = None
-            system_prompt = None
-            base_model = model or 'qwen3:14b'
-            effective_custom_model_id = custom_model_id or conversation.custom_model_id
-            
-            if effective_custom_model_id:
-                custom_model = CustomModel.query.get(effective_custom_model_id)
-                if custom_model:
-                    base_model = custom_model.base_model or base_model
-                    system_prompt = custom_model.system_prompt
-                    # Sync conversation's custom_model_id if changed
-                    if conversation.custom_model_id != effective_custom_model_id:
-                        conversation.custom_model_id = effective_custom_model_id
-                        db.session.commit()
+            model_context = self._resolve_model_context(
+                conversation=conversation,
+                model=model,
+                custom_model_id=custom_model_id,
+                external_model_id=external_model_id
+            )
+            provider = model_context['provider']
+            base_model = model_context['base_model']
+            system_prompt = model_context['system_prompt']
+            effective_custom_model_id = model_context['custom_model_id']
+            external_model = model_context['external_model']
             
             # Save user message
             user_msg = self.add_message(conversation_id, 'user', user_message)
             
-            # Stage 1: Classify question (fast, no thinking)
-            yield self._sse_event('status', {'message': 'Analyzing question...'})
-            classifier = QuestionClassifier(self.ollama_service)
-            classification = classifier.classify(user_message, base_model)
-
-            question_type = classification.get('type', 'KNOWLEDGE')
-            keywords = classification.get('keywords', [])
-
-            logger.info(f"Question classified as: {question_type}, keywords: {keywords}")
-
-            # Stage 2: Based on classification, decide RAG usage
-            if question_type == 'SYSTEM':
-                context, sources = '', []
-                yield self._sse_event('status', {'message': 'Handling system question...'})
-
-                # For SYSTEM questions, use a clean prompt without RAG context
-                messages = self._build_system_prompt(user_message, system_prompt)
-
-                # Prepend minimal conversation history (only assistant's identity info)
-                history = self.get_conversation_history(conversation_id, limit=2)
-                if len(history) > 1:
-                    # Only keep the last user message before this one
-                    for msg in history[:-1]:
-                        if msg['role'] == 'user':
-                            messages.insert(1, msg)
-                            break
-
-            elif question_type == 'KNOWLEDGE':
-                yield self._sse_event('status', {'message': 'Searching knowledge base...'})
-                context, sources = self.get_rag_context(user_message, effective_custom_model_id)
-                if sources:
-                    yield self._sse_event('sources', {'sources': sources})
-
-                # Get conversation history
-                history = self.get_conversation_history(conversation_id, limit=10)
-                messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
-                if len(history) > 1:
-                    for msg in history[:-1]:
-                        messages.insert(1, msg)
-
-            else:
+            if provider == 'external':
+                question_type = 'GENERAL'
+                keywords = []
                 context, sources = '', []
                 yield self._sse_event('status', {'message': 'Generating response...'})
                 messages = self._build_system_prompt(user_message, system_prompt)
+                history = self.get_conversation_history(conversation_id, limit=10)
+                if len(history) > 1:
+                    for msg in history[:-1]:
+                        messages.insert(1, msg)
+            else:
+                # Stage 1: Classify question (fast, no thinking)
+                yield self._sse_event('status', {'message': 'Analyzing question...'})
+                classifier = QuestionClassifier(self.ollama_service)
+                classification = classifier.classify(user_message, base_model)
+
+                question_type = classification.get('type', 'KNOWLEDGE')
+                keywords = classification.get('keywords', [])
+
+                logger.info(f"Question classified as: {question_type}, keywords: {keywords}")
+
+                # Stage 2: Based on classification, decide RAG usage
+                if question_type == 'SYSTEM':
+                    context, sources = '', []
+                    yield self._sse_event('status', {'message': 'Handling system question...'})
+
+                    # For SYSTEM questions, use a clean prompt without RAG context
+                    messages = self._build_system_prompt(user_message, system_prompt)
+
+                    # Prepend minimal conversation history (only assistant's identity info)
+                    history = self.get_conversation_history(conversation_id, limit=2)
+                    if len(history) > 1:
+                        # Only keep the last user message before this one
+                        for msg in history[:-1]:
+                            if msg['role'] == 'user':
+                                messages.insert(1, msg)
+                                break
+
+                elif question_type == 'KNOWLEDGE':
+                    yield self._sse_event('status', {'message': 'Searching knowledge base...'})
+                    context, sources = self.get_rag_context(user_message, effective_custom_model_id)
+                    if sources:
+                        yield self._sse_event('sources', {'sources': sources})
+
+                    # Get conversation history
+                    history = self.get_conversation_history(conversation_id, limit=10)
+                    messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
+                    if len(history) > 1:
+                        for msg in history[:-1]:
+                            messages.insert(1, msg)
+
+                else:
+                    context, sources = '', []
+                    yield self._sse_event('status', {'message': 'Generating response...'})
+                    messages = self._build_system_prompt(user_message, system_prompt)
             
             # Start streaming response
             yield self._sse_event('status', {'message': 'Generating response...'})
@@ -520,7 +569,7 @@ If the context doesn't contain relevant information, answer based on your genera
             thinking_started_at = None
             thinking_duration = 0
             
-            for chunk in self.ollama_service.chat_stream(base_model, messages):
+            for chunk in self._stream_response(provider, base_model, messages, external_model=external_model):
                 if 'message' in chunk:
                     msg = chunk['message']
                     
@@ -634,7 +683,8 @@ If the context doesn't contain relevant information, answer based on your genera
     
     def regenerate_response(self, conversation_id: str, user_id: str,
                             model: str = None,
-                            custom_model_id: str = None) -> Generator:
+                            custom_model_id: str = None,
+                            external_model_id: str = None) -> Generator:
         """
         Regenerate the last assistant response.
         Deletes the last assistant message and re-generates.
@@ -672,50 +722,57 @@ If the context doesn't contain relevant information, answer based on your genera
             db.session.delete(last_assistant)
             db.session.commit()
             
-            # Re-generate using chat_stream logic (but skip adding user message)
-            # Resolve custom model with same priority as chat_stream
-            custom_model = None
-            system_prompt = None
-            base_model = model or 'qwen3:14b'
-            effective_custom_model_id = custom_model_id or conversation.custom_model_id
-            
-            if effective_custom_model_id:
-                custom_model = CustomModel.query.get(effective_custom_model_id)
-                if custom_model:
-                    base_model = custom_model.base_model or base_model
-                    system_prompt = custom_model.system_prompt
-                    if conversation.custom_model_id != effective_custom_model_id:
-                        conversation.custom_model_id = effective_custom_model_id
-                        db.session.commit()
-            
-            # Get RAG context
-            # Stage 1: Classify question (fast, no thinking)
-            yield self._sse_event('status', {'message': 'Analyzing question...'})
-            classifier = QuestionClassifier(self.ollama_service)
-            classification = classifier.classify(user_message, base_model)
+            model_context = self._resolve_model_context(
+                conversation=conversation,
+                model=model,
+                custom_model_id=custom_model_id,
+                external_model_id=external_model_id
+            )
+            provider = model_context['provider']
+            base_model = model_context['base_model']
+            system_prompt = model_context['system_prompt']
+            effective_custom_model_id = model_context['custom_model_id']
+            external_model = model_context['external_model']
 
-            question_type = classification.get('type', 'KNOWLEDGE')
-            keywords = classification.get('keywords', [])
-
-            # Stage 2: Based on classification, decide RAG usage
-            if question_type == 'SYSTEM':
-                context, sources = '', []
-                yield self._sse_event('status', {'message': 'Handling system question...'})
-            elif question_type == 'KNOWLEDGE':
-                yield self._sse_event('status', {'message': 'Searching knowledge base...'})
-                context, sources = self.get_rag_context(user_message, effective_custom_model_id)
-                if sources:
-                    yield self._sse_event('sources', {'sources': sources})
-            else:
+            if provider == 'external':
+                question_type = 'GENERAL'
+                keywords = []
                 context, sources = '', []
                 yield self._sse_event('status', {'message': 'Generating response...'})
-            
-            history = self.get_conversation_history(conversation_id, limit=10)
-            messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
-            
-            if len(history) > 1:
-                for msg in history[:-1]:
-                    messages.insert(1, msg)
+                history = self.get_conversation_history(conversation_id, limit=10)
+                messages = self._build_system_prompt(user_message, system_prompt)
+                if len(history) > 1:
+                    for msg in history[:-1]:
+                        messages.insert(1, msg)
+            else:
+                # Get RAG context
+                # Stage 1: Classify question (fast, no thinking)
+                yield self._sse_event('status', {'message': 'Analyzing question...'})
+                classifier = QuestionClassifier(self.ollama_service)
+                classification = classifier.classify(user_message, base_model)
+
+                question_type = classification.get('type', 'KNOWLEDGE')
+                keywords = classification.get('keywords', [])
+
+                # Stage 2: Based on classification, decide RAG usage
+                if question_type == 'SYSTEM':
+                    context, sources = '', []
+                    yield self._sse_event('status', {'message': 'Handling system question...'})
+                elif question_type == 'KNOWLEDGE':
+                    yield self._sse_event('status', {'message': 'Searching knowledge base...'})
+                    context, sources = self.get_rag_context(user_message, effective_custom_model_id)
+                    if sources:
+                        yield self._sse_event('sources', {'sources': sources})
+                else:
+                    context, sources = '', []
+                    yield self._sse_event('status', {'message': 'Generating response...'})
+                
+                history = self.get_conversation_history(conversation_id, limit=10)
+                messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
+                
+                if len(history) > 1:
+                    for msg in history[:-1]:
+                        messages.insert(1, msg)
             
             yield self._sse_event('status', {'message': 'Generating response...'})
             
@@ -725,7 +782,7 @@ If the context doesn't contain relevant information, answer based on your genera
             thinking_started_at = None
             thinking_duration = 0
             
-            for chunk in self.ollama_service.chat_stream(base_model, messages):
+            for chunk in self._stream_response(provider, base_model, messages, external_model=external_model):
                 if 'message' in chunk:
                     msg = chunk['message']
                     
@@ -788,12 +845,14 @@ If the context doesn't contain relevant information, answer based on your genera
         # Search in conversation titles
         title_matches = Conversation.query.filter(
             Conversation.user_id == user_id,
+            Conversation.deleted_by_user.is_(False),
             Conversation.title.ilike(f'%{query}%')
         ).all()
         
         # Search in message content
         message_matches = db.session.query(Conversation).join(Message).filter(
             Conversation.user_id == user_id,
+            Conversation.deleted_by_user.is_(False),
             Message.content.ilike(f'%{query}%')
         ).distinct().all()
         

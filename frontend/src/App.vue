@@ -9,7 +9,6 @@
 <script setup>
 import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { setItem } from '@/utils/storage'
 
 const route = useRoute()
 

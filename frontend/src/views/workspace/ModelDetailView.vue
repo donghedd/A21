@@ -83,7 +83,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const res = await modelApi.getCustomModels()
-    model.value = (res.data || []).find(m => m.id === Number(modelId)) || null
+    model.value = (res.data || []).find(m => String(m.id) === String(modelId)) || null
   } catch {} finally {
     loading.value = false
   }
@@ -93,7 +93,9 @@ onMounted(async () => {
 <style scoped lang="scss">
 .page-container {
   padding: 24px 28px;
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
+  overflow: auto;
   background: linear-gradient(135deg, #FAFBFE 0%, #F3F1FF 50%, #EEEDF9 100%);
 }
 

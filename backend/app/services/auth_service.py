@@ -1,6 +1,7 @@
 """
 Authentication Service
 """
+from datetime import datetime
 from ..models import User
 from ..extensions import db
 
@@ -47,6 +48,9 @@ class AuthService:
         
         if not user.check_password(password):
             return {'success': False, 'message': 'Invalid password'}
+
+        user.last_login_at = datetime.utcnow()
+        db.session.commit()
         
         return {
             'success': True,

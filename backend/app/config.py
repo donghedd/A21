@@ -83,6 +83,42 @@ class Config:
         os.getenv('CHROMA_PERSIST_DIRECTORY', 'vector_db')
     )
 
+    # Knowledge Graph Configuration
+    KG_ENABLED = os.getenv('KG_ENABLED', 'false').lower() == 'true'
+    KG_PROVIDER = os.getenv('KG_PROVIDER', 'neo4j')
+    KG_TYPED_OUTPUT_DIR = os.getenv('KG_TYPED_OUTPUT_DIR', 'kg_typed_output')
+    KG_RAW_OUTPUT_DIR = os.getenv('KG_RAW_OUTPUT_DIR', 'kg_output')
+    KG_EVIDENCE_REQUIRED = os.getenv('KG_EVIDENCE_REQUIRED', 'true').lower() == 'true'
+    KG_DEFAULT_EXPAND_DEPTH = int(os.getenv('KG_DEFAULT_EXPAND_DEPTH', 2))
+    KG_MAX_EXPAND_DEPTH = int(os.getenv('KG_MAX_EXPAND_DEPTH', 3))
+    KG_DEFAULT_NODE_LIMIT = int(os.getenv('KG_DEFAULT_NODE_LIMIT', 120))
+    KG_DEFAULT_EDGE_LIMIT = int(os.getenv('KG_DEFAULT_EDGE_LIMIT', 200))
+    KG_HIDE_BOOK_BY_DEFAULT = os.getenv('KG_HIDE_BOOK_BY_DEFAULT', 'true').lower() == 'true'
+    KG_HIDE_COVERS_BY_DEFAULT = os.getenv('KG_HIDE_COVERS_BY_DEFAULT', 'true').lower() == 'true'
+    KG_DEFAULT_VISIBLE_NODE_TYPES = os.getenv(
+        'KG_DEFAULT_VISIBLE_NODE_TYPES',
+        'Device,Fault,Cause,Symptom,Action,Parameter'
+    )
+    KG_DEFAULT_VISIBLE_REL_TYPES = os.getenv(
+        'KG_DEFAULT_VISIBLE_REL_TYPES',
+        'HAS_FAULT,CAUSED_BY,HAS_SYMPTOM,RESOLVED_BY,TARGETS,AFFECTS_PARAMETER,SHOWS_AS,HAS_COMPONENT'
+    )
+    TECH_KG_MAX_KEYWORD_PAGE_SIZE = int(os.getenv('TECH_KG_MAX_KEYWORD_PAGE_SIZE', 100))
+    TECH_KG_MAX_GRAPH_DEPTH = int(os.getenv('TECH_KG_MAX_GRAPH_DEPTH', 3))
+    TECH_KG_MAX_GRAPH_NODES = int(os.getenv('TECH_KG_MAX_GRAPH_NODES', 200))
+    TECH_KG_MAX_RESOURCE_COUNT = int(os.getenv('TECH_KG_MAX_RESOURCE_COUNT', 30))
+
+    # Neo4j Configuration
+    NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+    NEO4J_USERNAME = os.getenv('NEO4J_USERNAME', 'neo4j')
+    NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'neo4j')
+    NEO4J_DATABASE = os.getenv('NEO4J_DATABASE', 'neo4j')
+
+    # Search Enhancement for Knowledge Graph
+    KG_SEARCH_BACKEND = os.getenv('KG_SEARCH_BACKEND', 'builtin')
+    ELASTICSEARCH_URL = os.getenv('ELASTICSEARCH_URL', 'http://localhost:9200')
+    ELASTICSEARCH_INDEX = os.getenv('ELASTICSEARCH_INDEX', 'ship_fault_kg')
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

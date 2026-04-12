@@ -3,10 +3,6 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
-        <el-button @click="$router.push('/')" text class="back-btn">
-          <el-icon><ArrowLeft /></el-icon>
-          返回对话
-        </el-button>
         <h2 class="page-title">工作空间</h2>
       </div>
     </div>
@@ -78,7 +74,7 @@
           </div>
         </div>
 
-        <el-empty v-if="!loadingCustom && customModels.length === 0" description="暂无自定义模型，点击新建开始使用" :image-size="100" />
+        <el-empty v-if="!loadingCustom && customModels.length === 0" class="page-empty" description="暂无自定义模型，点击新建开始使用" :image-size="100" />
       </div>
     </section>
 
@@ -214,10 +210,11 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Plus, ArrowLeft, Refresh, MoreFilled, Edit, Delete, FolderOpened, Document, Check, Close } from '@element-plus/icons-vue'
+import { Plus, Refresh, MoreFilled, Edit, Delete, FolderOpened, Document, Check, Close } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as modelApi from '@/api/model'
 import * as knowledgeApi from '@/api/knowledge'
+import { getCache, setCache, invalidateCache } from '@/utils/cache'
 
 const loadingOllama = ref(false)
 const loadingCustom = ref(false)
@@ -240,19 +237,50 @@ const availKbs = computed(() => {
 })
 
 async function loadOllamaModels() {
-  loadingOllama.value = true
-  try { ollamaModels.value = (await modelApi.getOllamaModels()).data || [] }
+  const cached = getCache('models:ollama')
+  if (cached) {
+    ollamaModels.value = cached.data || cached || []
+    loadingOllama.value = false
+  } else {
+    loadingOllama.value = true
+  }
+
+  try {
+    const res = await modelApi.getOllamaModels()
+    ollamaModels.value = res.data || []
+    setCache('models:ollama', res, 5 * 60 * 1000)
+  }
   catch (e) {} finally { loadingOllama.value = false }
 }
 
 async function loadCustomModels() {
-  loadingCustom.value = true
-  try { customModels.value = (await modelApi.getCustomModels()).data || [] }
+  const cached = getCache('models:custom')
+  if (cached) {
+    customModels.value = cached.data || cached || []
+    loadingCustom.value = false
+  } else {
+    loadingCustom.value = true
+  }
+
+  try {
+    const res = await modelApi.getCustomModels()
+    customModels.value = res.data || []
+    setCache('models:custom', res, 5 * 60 * 1000)
+  }
   catch (e) {} finally { loadingCustom.value = false }
 }
 
 async function loadAllKbs() {
-  try { allKbs.value = (await knowledgeApi.getKnowledgeBases()).data || [] } catch {}
+  const cached = getCache('knowledge:bases')
+  if (cached) {
+    allKbs.value = cached.data || cached || []
+  }
+
+  try {
+    const res = await knowledgeApi.getKnowledgeBases()
+    allKbs.value = res.data || []
+    setCache('knowledge:bases', res, 30 * 1000)
+  } catch {}
 }
 
 function openCreateDialog(m) {
@@ -278,6 +306,7 @@ async function saveModel() {
       await modelApi.createCustomModel(modelForm)
       ElMessage.success('已创建')
     }
+    invalidateCache('models:custom')
     showModelDialog.value = false
     loadCustomModels()
   } catch { ElMessage.error('保存失败') } finally { saving.value = false }
@@ -288,6 +317,7 @@ async function deleteModel(m) {
     await ElMessageBox.confirm(`确定删除「${m.name}」？`, '确认', { type: 'warning' })
     await modelApi.deleteCustomModel(m.id)
     customModels.value = customModels.value.filter(x => x.id !== m.id)
+    invalidateCache('models:custom')
     ElMessage.success('已删除')
   } catch {}
 }
@@ -316,14 +346,25 @@ async function unbindKb(kb) {
 
 function truncate(s, n) { return s?.length > n ? s.slice(0, n) + '...' : s }
 
-onMounted(() => { loadOllamaModels(); loadCustomModels(); loadAllKbs() })
+onMounted(() => {
+  loadCustomModels()
+  loadAllKbs()
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(() => loadOllamaModels(), { timeout: 1500 })
+  } else {
+    setTimeout(() => loadOllamaModels(), 250)
+  }
+})
 </script>
 
 <style scoped lang="scss">
 // Sapphire Elegance Theme - 与主页会话页一致
 .page-container {
   padding: 24px 28px;
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
+  overflow: auto;
   background: linear-gradient(135deg, #FAFBFE 0%, #F3F1FF 50%, #EEEDF9 100%);
 }
 
@@ -337,24 +378,6 @@ onMounted(() => { loadOllamaModels(); loadCustomModels(); loadAllKbs() })
   .header-left {
     display: flex;
     align-items: center;
-    gap: 16px;
-  }
-
-  .back-btn {
-    color: #5B5580;
-    font-weight: 500;
-    padding: 8px 12px;
-    border-radius: 10px;
-    transition: all 0.25s ease;
-
-    &:hover {
-      color: #6366F1;
-      background: rgba(99, 102, 241, 0.08);
-    }
-
-    .el-icon {
-      margin-right: 6px;
-    }
   }
 }
 
@@ -449,6 +472,12 @@ onMounted(() => { loadOllamaModels(); loadCustomModels(); loadAllKbs() })
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 20px;
+  min-height: 280px;
+}
+
+.page-empty {
+  grid-column: 1 / -1;
+  place-self: center;
 }
 
 .model-card {
@@ -779,6 +808,8 @@ onMounted(() => { loadOllamaModels(); loadCustomModels(); loadAllKbs() })
   gap: 10px;
   min-height: 48px;
   align-content: flex-start;
+  justify-content: center;
+  text-align: center;
 
   .bound-tag {
     background: rgba(99, 102, 241, 0.08);
@@ -786,6 +817,9 @@ onMounted(() => { loadOllamaModels(); loadCustomModels(); loadAllKbs() })
     color: #6366F1;
     padding: 8px 14px;
     font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 
     .el-icon {
       margin-right: 6px;
@@ -804,6 +838,9 @@ onMounted(() => { loadOllamaModels(); loadCustomModels(); loadAllKbs() })
     padding: 8px 14px;
     font-weight: 500;
     transition: all 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 
     &:hover {
       border-style: solid;

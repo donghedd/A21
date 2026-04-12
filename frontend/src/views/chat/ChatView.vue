@@ -1,5 +1,16 @@
 <template>
   <div class="chat-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <transition name="fade">
+      <el-button
+        v-if="sidebarCollapsed"
+        class="floating-sidebar-toggle"
+        :icon="Expand"
+        circle
+        size="small"
+        @click="toggleSidebar"
+      />
+    </transition>
+
     <!-- 侧边栏 - 会话管理 -->
     <aside class="chat-sidebar">
       <!-- Logo 和新建对话 -->
@@ -27,15 +38,19 @@
 
       <!-- 导航菜单 -->
       <nav class="sidebar-nav">
-        <div class="nav-item" @click="showSearchDialog = true">
+        <div class="nav-item" @click="openSearchDialog">
           <el-icon><Search /></el-icon>
           <span>搜索</span>
         </div>
-        <div class="nav-item" @click="$router.push('/knowledge')">
+        <div class="nav-item" :class="{ active: isRouteActive('/kg') }" @click="navigateToPanel('/kg')">
+          <el-icon><Share /></el-icon>
+          <span>知识图谱</span>
+        </div>
+        <div class="nav-item" :class="{ active: isRouteActive('/knowledge') }" @click="navigateToPanel('/knowledge')">
           <el-icon><Document /></el-icon>
           <span>知识库</span>
         </div>
-        <div class="nav-item" @click="$router.push('/workspace')">
+        <div class="nav-item" :class="{ active: isRouteActive('/workspace') }" @click="navigateToPanel('/workspace')">
           <el-icon><Setting /></el-icon>
           <span>工作空间</span>
         </div>
@@ -48,26 +63,32 @@
         </div>
 
         <div v-if="conversations.length > 0" class="conv-items">
-          <div
+          <el-dropdown
             v-for="conv in conversations"
             :key="conv.id"
-            class="conv-item"
-            :class="{ active: conv.id === currentConversationId }"
-            @click="selectConversation(conv.id)"
+            trigger="contextmenu"
+            placement="right-start"
+            @command="(cmd) => onConversationCommand(cmd, conv)"
           >
-            <el-icon class="conv-icon"><ChatDotRound /></el-icon>
-            <span class="conv-title">{{ conv.title || '新对话' }}</span>
-            <el-dropdown trigger="click" class="conv-actions" @click.stop>
-              <el-icon class="action-btn"><MoreFilled /></el-icon>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="deleteConversation(conv.id)">
-                    <el-icon><Delete /></el-icon>删除
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
+            <div
+              class="conv-item"
+              :class="{ active: conv.id === currentConversationId }"
+              @click="selectConversation(conv.id)"
+            >
+              <el-icon class="conv-icon"><ChatDotRound /></el-icon>
+              <span class="conv-title">{{ conv.title || '新对话' }}</span>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="rename">
+                  <el-icon><Edit /></el-icon>修改
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" divided class="delete-item">
+                  <el-icon><Delete /></el-icon>删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
 
         <el-empty v-if="conversations.length === 0" description="暂无对话" :image-size="60" />
@@ -75,50 +96,71 @@
 
       <!-- 用户信息 -->
       <div class="sidebar-footer">
-        <el-dropdown>
-          <div class="user-info">
-            <el-avatar :size="32">{{ user?.username?.[0] || 'U' }}</el-avatar>
-            <span>{{ user?.username || 'User' }}</span>
-            <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
-          </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="showUserSwitchDialog = true">
-                <el-icon><Switch /></el-icon>切换用户
-              </el-dropdown-item>
-              <el-dropdown-item divided @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <div class="user-footer-row">
+          <el-dropdown>
+            <div class="user-info">
+              <el-avatar :size="32">{{ user?.username?.[0] || 'U' }}</el-avatar>
+              <span>{{ user?.username || 'User' }}</span>
+              <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="showUserSwitchDialog = true">
+                  <el-icon><Switch /></el-icon>切换用户
+                </el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">
+                  <el-icon><SwitchButton /></el-icon>退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button
+            v-if="authStore.isAdmin"
+            text
+            class="switch-side-btn"
+            @click="router.push({ name: 'Admin' })"
+          >
+            切换为管理端
+          </el-button>
+        </div>
       </div>
     </aside>
 
-    <!-- 主聊天区域 -->
-    <main class="chat-main">
-      <AiChat
-        :title="currentConversationTitle"
-        :messages="messages"
-        :is-streaming="streaming.isStreaming.value"
-        :models="availableModels"
-        :default-model="selectedModel"
-        :user-name="user?.username"
-        :show-sidebar-toggle="sidebarCollapsed"
-        :sidebar-collapsed="sidebarCollapsed"
-        :prompts="defaultPrompts"
-        @send="handleSend"
-        @stop="handleStop"
-        @regenerate="handleRegenerate"
-        @edit="handleEdit"
-        @source-click="showSourceDetail"
-        @update:model="selectedModel = $event"
-        @update:sidebar-collapsed="sidebarCollapsed = $event"
-      />
-    </main>
+    <!-- 主内容区域 -->
+    <section class="chat-content">
+      <router-view v-slot="{ Component, route: childRoute }">
+        <component
+          :is="Component"
+          v-if="childRoute.name === 'ChatHome'"
+          :title="currentConversationTitle"
+          :messages="messages"
+          :is-streaming="streaming.isStreaming.value"
+          :models="availableModels"
+          :default-model="selectedModel"
+          :user-name="user?.username"
+          :show-sidebar-toggle="sidebarCollapsed"
+          :sidebar-collapsed="sidebarCollapsed"
+          :prompts="defaultPrompts"
+          :editing-message-id="editingMessageId"
+          :title-editable="!!currentConversationId"
+          @send="handleSend"
+          @stop="handleStop"
+          @regenerate="handleRegenerate"
+          @edit="handleEdit"
+          @edit-submit="handleEditSubmit"
+          @edit-cancel="handleEditCancel"
+          @title-submit="handleTitleSubmit"
+          @source-click="showSourceDetail"
+          @update:model="selectedModel = $event"
+          @update:sidebar-collapsed="sidebarCollapsed = $event"
+        />
+        <component :is="Component" v-else />
+      </router-view>
+    </section>
 
     <!-- 来源详情弹窗 -->
     <el-dialog
+      v-if="isChatHomeRoute"
       v-model="sourceDialogVisible"
       width="640px"
       destroy-on-close
@@ -157,6 +199,7 @@
 
     <!-- 搜索对话框 -->
     <el-dialog
+      v-if="isChatHomeRoute"
       v-model="showSearchDialog"
       title="搜索对话"
       width="520px"
@@ -184,7 +227,7 @@
         />
         <div class="search-results" v-if="searchQuery.trim()">
           <div
-            v-for="conv in conversations"
+            v-for="conv in searchResults"
             :key="conv.id"
             class="search-result-item"
             @click="selectConversation(conv.id); showSearchDialog = false"
@@ -198,7 +241,7 @@
             </div>
             <el-icon class="result-arrow"><ArrowRight /></el-icon>
           </div>
-          <el-empty v-if="conversations.length === 0" description="未找到相关对话" :image-size="80" />
+          <el-empty v-if="searchResults.length === 0" description="未找到相关对话" :image-size="80" />
         </div>
         <div v-else class="search-placeholder">
           <el-icon :size="48" class="placeholder-icon"><Search /></el-icon>
@@ -248,14 +291,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Plus,
   ChatRound,
   Search,
+  Share,
   Document,
   Setting,
+  Edit,
+  Delete,
   SwitchButton,
   Switch,
   ArrowDown,
@@ -272,13 +318,13 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useStreaming } from '@/composables/useStreaming'
-import { AiChat } from '@/components/ai'
 import * as chatApi from '@/api/chat'
 import * as modelApi from '@/api/model'
-import { getItem, setItem, removeItem } from '@/utils/storage'
+import { getItem, setItem } from '@/utils/storage'
 import { getOrFetch, invalidateCache, CACHE_TTL } from '@/utils/cache'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const streaming = useStreaming()
 
@@ -289,13 +335,15 @@ const currentConversationId = ref(null)
 const messages = ref([])
 const selectedModel = ref(null)
 const availableModels = ref([])
-const defaultModelId = ref(getItem('sfqa_default_model') || null)
 const sidebarCollapsed = ref(false)
 const searchQuery = ref('')
+const searchResults = ref([])
 const sourceDialogVisible = ref(false)
 const selectedSource = ref(null)
 const showSearchDialog = ref(false)
 const showUserSwitchDialog = ref(false)
+const editingMessageId = ref(null)
+const editingSnapshot = ref(null)
 
 // 默认提示
 const defaultPrompts = [
@@ -311,6 +359,72 @@ const currentConversationTitle = computed(() => {
   const conv = conversations.value.find(c => c.id === currentConversationId.value)
   return conv?.title || ''
 })
+const isChatHomeRoute = computed(() => route.name === 'ChatHome')
+
+function isRouteActive(prefix) {
+  return route.path === prefix || route.path.startsWith(`${prefix}/`)
+}
+
+async function navigateToPanel(path) {
+  if (route.path === path) return
+
+  showSearchDialog.value = false
+  sourceDialogVisible.value = false
+
+  await router.push(path)
+}
+
+async function openSearchDialog() {
+  if (route.name !== 'ChatHome') {
+    await router.push({ name: 'ChatHome' })
+  }
+
+  searchQuery.value = ''
+  searchResults.value = []
+  showSearchDialog.value = true
+}
+
+function clearEditState() {
+  editingMessageId.value = null
+  editingSnapshot.value = null
+}
+
+function restoreEditedMessages() {
+  if (!editingSnapshot.value?.restoreOnCancel) {
+    clearEditState()
+    return
+  }
+
+  const { targetIndex, followingMessages } = editingSnapshot.value
+  const preserved = messages.value.slice(0, targetIndex + 1)
+  messages.value = [...preserved, ...followingMessages]
+  clearEditState()
+}
+
+function removeStreamingArtifacts() {
+  messages.value = messages.value.filter(msg => !msg.isStreaming)
+}
+
+async function resolveEditableMessageId(snapshot) {
+  if (!snapshot?.targetId || !String(snapshot.targetId).startsWith('temp-user-')) {
+    return snapshot?.targetId
+  }
+
+  const currentMessage = messages.value[snapshot.targetIndex]
+  if (!currentMessage) return null
+
+  const res = await chatApi.getConversation(currentConversationId.value)
+  const serverMessages = res.data?.messages || []
+  const matchedUserMessage = [...serverMessages].reverse().find(msg => (
+    msg.role === 'user' && msg.content === currentMessage.content
+  ))
+
+  if (!matchedUserMessage) return null
+
+  snapshot.targetId = matchedUserMessage.id
+  currentMessage.id = matchedUserMessage.id
+  return matchedUserMessage.id
+}
 
 // 方法
 async function loadModels() {
@@ -371,15 +485,10 @@ async function loadConversations() {
 }
 
 async function createNewChat() {
-  try {
-    const res = await chatApi.createConversation()
-    const conv = res.data
-    conversations.value.unshift(conv)
-    invalidateCache('conversations:list')
-    selectConversation(conv.id)
-  } catch (error) {
-    ElMessage.error('创建对话失败')
-  }
+  clearEditState()
+  currentConversationId.value = null
+  messages.value = []
+  await router.push({ name: 'ChatHome' })
 }
 
 async function deleteConversation(id) {
@@ -392,16 +501,26 @@ async function deleteConversation(id) {
     await chatApi.deleteConversation(id)
     conversations.value = conversations.value.filter(c => c.id !== id)
     invalidateCache('conversations:list')
+    invalidateCache(`conversations:messages:${id}`)
     if (currentConversationId.value === id) {
       currentConversationId.value = null
       messages.value = []
+      clearEditState()
     }
     ElMessage.success('对话已删除')
   } catch {}
 }
 
 async function selectConversation(id) {
-  if (currentConversationId.value === id) return
+  if (editingMessageId.value) {
+    clearEditState()
+  }
+
+  if (route.name !== 'ChatHome') {
+    await router.push({ name: 'ChatHome' })
+  }
+
+  if (currentConversationId.value === id && messages.value.length > 0) return
 
   currentConversationId.value = id
 
@@ -439,8 +558,9 @@ async function handleSend({ content, model }) {
   }
 
   // 添加用户消息
+  const userMessageId = 'temp-user-' + Date.now()
   messages.value.push({
-    id: 'temp-' + Date.now(),
+    id: userMessageId,
     role: 'user',
     content,
     created_at: new Date().toISOString()
@@ -512,6 +632,11 @@ async function handleSend({ content, model }) {
         }
       },
       onDone: (result) => {
+        const userMsg = messages.value.find(m => m.id === userMessageId)
+        if (userMsg && result.userMessageId) {
+          userMsg.id = result.userMessageId
+        }
+
         const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
         if (assistantMsg) {
           assistantMsg.id = result.messageId || assistantMessageId
@@ -556,8 +681,14 @@ async function handleSend({ content, model }) {
   }
 }
 
-function handleStop() {
+function handleStop({ keepPartial = true } = {}) {
   streaming.abort()
+
+  if (!keepPartial) {
+    removeStreamingArtifacts()
+    streaming.reset()
+    return
+  }
 
   // 立即更新当前正在流式传输的消息状态
   const streamingMsg = messages.value.find(m => m.isStreaming)
@@ -569,7 +700,7 @@ function handleStop() {
 }
 
 async function handleRegenerate(item) {
-  if (!currentConversationId.value || streaming.isStreaming.value) return
+  if (!currentConversationId.value || streaming.isStreaming.value || editingMessageId.value) return
 
   // 移除最后一条助手消息
   const lastIdx = messages.value.length - 1
@@ -681,7 +812,60 @@ async function handleRegenerate(item) {
 }
 
 function handleEdit(item) {
-  // 编辑消息的逻辑在AiChat组件中处理
+  if (!currentConversationId.value) return
+
+  if (editingMessageId.value === item.id) return
+
+  if (editingMessageId.value) {
+    restoreEditedMessages()
+  }
+
+  const targetIndex = messages.value.findIndex(msg => msg.id === item.id)
+  if (targetIndex < 0) return
+
+  const followingMessages = messages.value.slice(targetIndex + 1)
+  const wasStreaming = streaming.isStreaming.value
+
+  if (wasStreaming) {
+    handleStop({ keepPartial: false })
+  }
+
+  editingSnapshot.value = {
+    targetId: item.id,
+    targetIndex,
+    followingMessages: wasStreaming ? [] : followingMessages,
+    restoreOnCancel: !wasStreaming
+  }
+  editingMessageId.value = item.id
+  messages.value = messages.value.slice(0, targetIndex + 1)
+}
+
+async function handleEditSubmit({ item, content }) {
+  const nextContent = content?.trim()
+  if (!nextContent || !currentConversationId.value) return
+
+  const snapshot = editingSnapshot.value
+  if (!snapshot?.targetId) return
+
+  try {
+    const targetId = await resolveEditableMessageId(snapshot)
+    if (!targetId) {
+      throw new Error('missing_target_id')
+    }
+
+    await chatApi.deleteMessagesFrom(currentConversationId.value, targetId)
+    messages.value = messages.value.slice(0, snapshot.targetIndex)
+    clearEditState()
+    invalidateCache(`conversations:messages:${currentConversationId.value}`)
+    invalidateCache('conversations:list')
+    await handleSend({ content: nextContent, model: selectedModel.value })
+  } catch (error) {
+    ElMessage.error('编辑消息失败')
+  }
+}
+
+function handleEditCancel() {
+  restoreEditedMessages()
 }
 
 function showSourceDetail(source) {
@@ -693,17 +877,28 @@ function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
-async function handleRename(item) {
+function onConversationCommand(command, conversation) {
+  if (command === 'rename') {
+    handleRename(conversation)
+    return
+  }
+
+  if (command === 'delete') {
+    deleteConversation(conversation.id)
+  }
+}
+
+async function handleRename(conversation) {
   try {
     const { value } = await ElMessageBox.prompt('请输入新标题', '重命名对话', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputValue: item.label
+      inputValue: conversation.title || '新对话'
     })
 
     if (value && value.trim()) {
-      await chatApi.updateConversation(item.key, { title: value.trim() })
-      const conv = conversations.value.find(c => c.id === item.key)
+      await chatApi.updateConversation(conversation.id, { title: value.trim() })
+      const conv = conversations.value.find(c => c.id === conversation.id)
       if (conv) conv.title = value.trim()
       invalidateCache('conversations:list')
       ElMessage.success('重命名成功')
@@ -713,23 +908,19 @@ async function handleRename(item) {
   }
 }
 
-async function handleDelete(item) {
-  try {
-    await ElMessageBox.confirm('确定要删除这个对话吗？', '确认删除', {
-      type: 'warning'
-    })
+async function handleTitleSubmit(title) {
+  const nextTitle = title?.trim()
+  if (!nextTitle || !currentConversationId.value) return
 
-    await chatApi.deleteConversation(item.key)
-    conversations.value = conversations.value.filter(c => c.id !== item.key)
-    if (currentConversationId.value === item.key) {
-      currentConversationId.value = null
-      messages.value = []
+  try {
+    await chatApi.updateConversation(currentConversationId.value, { title: nextTitle })
+    const currentConversation = conversations.value.find(c => c.id === currentConversationId.value)
+    if (currentConversation) {
+      currentConversation.title = nextTitle
     }
     invalidateCache('conversations:list')
-    invalidateCache(`conversations:messages:${item.key}`)
-    ElMessage.success('删除成功')
-  } catch {
-    // 用户取消
+  } catch (error) {
+    ElMessage.error('标题更新失败')
   }
 }
 
@@ -740,12 +931,13 @@ async function handleSearch() {
     if (searchQuery.value.trim()) {
       try {
         const res = await chatApi.searchConversations({ q: searchQuery.value })
-        conversations.value = res.data?.conversations || []
+        searchResults.value = res.data?.conversations || []
       } catch (error) {
         console.error('Search failed:', error)
+        searchResults.value = []
       }
     } else {
-      loadConversations()
+      searchResults.value = []
     }
   }, 300)
 }
@@ -783,10 +975,31 @@ function formatDate(dateStr) {
   return date.toLocaleDateString('zh-CN')
 }
 
+let prefetchedWorkspaceRoutes = false
+function prefetchWorkspaceRoutes() {
+  if (prefetchedWorkspaceRoutes) return
+  prefetchedWorkspaceRoutes = true
+
+  const prefetch = () => {
+    import('@/views/kg/KnowledgeGraphView.vue')
+    import('@/views/knowledge/KnowledgeView.vue')
+    import('@/views/workspace/WorkspaceView.vue')
+    import('@/views/workspace/ModelDetailView.vue')
+  }
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(prefetch, { timeout: 1500 })
+    return
+  }
+
+  setTimeout(prefetch, 400)
+}
+
 // 生命周期
 onMounted(() => {
   loadConversations()
   loadModels()
+  prefetchWorkspaceRoutes()
 })
 </script>
 
@@ -903,6 +1116,16 @@ onMounted(() => {
       color: #4F46E5;
     }
 
+    &.active {
+      background: rgba(99, 102, 241, 0.12);
+      color: #4F46E5;
+      font-weight: 600;
+
+      .el-icon {
+        color: #6366F1;
+      }
+    }
+
     .el-icon {
       font-size: 18px;
       color: #A5A3C9;
@@ -919,6 +1142,10 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+
+  :deep(.el-dropdown) {
+    display: block;
+  }
 
   .list-header {
     padding: 10px 14px;
@@ -987,23 +1214,23 @@ onMounted(() => {
       transition: all 0.2s;
     }
 
-    .conv-actions {
-      opacity: 0;
-      transition: opacity 0.2s;
+  }
+}
 
-      .action-btn {
-        color: #A5A3C9;
-        font-size: 14px;
-        padding: 4px;
-        border-radius: 6px;
-        transition: all 0.2s;
+.floating-sidebar-toggle {
+  position: fixed;
+  top: 20px;
+  left: 18px;
+  z-index: 2200;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.18);
+  color: #6366F1;
 
-        &:hover {
-          color: #EF4444;
-          background: rgba(239, 68, 68, 0.08);
-        }
-      }
-    }
+  &:hover {
+    color: #4F46E5;
+    background: #FFFFFF;
   }
 }
 
@@ -1011,6 +1238,12 @@ onMounted(() => {
   padding: 14px 16px;
   border-top: 1px solid rgba(99, 102, 241, 0.08);
   background: rgba(255, 255, 255, 0.5);
+}
+
+.user-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .user-info {
@@ -1039,7 +1272,20 @@ onMounted(() => {
   }
 }
 
-.chat-main {
+.switch-side-btn {
+  flex-shrink: 0;
+  color: #6366F1;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 10px;
+
+  &:hover {
+    background: rgba(99, 102, 241, 0.08);
+    color: #4F46E5;
+  }
+}
+
+.chat-content {
   flex: 1;
   display: flex;
   flex-direction: column;

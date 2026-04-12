@@ -11,7 +11,23 @@
             size="small"
             @click="toggleSidebar"
           />
-          <span class="header-title">{{ title }}</span>
+          <el-input
+            v-if="isEditingTitle"
+            ref="titleInput"
+            v-model="titleDraft"
+            class="title-editor"
+            @keydown.enter.prevent="submitTitleEdit"
+            @keydown.esc.prevent="cancelTitleEdit"
+            @blur="submitTitleEdit"
+          />
+          <span
+            v-else
+            class="header-title"
+            :class="{ editable: titleEditable }"
+            @dblclick="startTitleEdit"
+          >
+            {{ title }}
+          </span>
         </slot>
       </div>
       
@@ -96,7 +112,29 @@
         <template #content="{ item }">
           <slot name="message-content" :item="item">
             <div class="message-content-wrapper">
+              <div v-if="isEditingMessage(item)" class="inline-edit-card">
+                <el-input
+                  ref="inlineEditInput"
+                  v-model="editingDraft"
+                  type="textarea"
+                  :autosize="{ minRows: 2, maxRows: 8 }"
+                  resize="none"
+                  @keydown.enter.exact.prevent="submitInlineEdit(item)"
+                />
+                <div class="inline-edit-actions">
+                  <el-button size="small" @click="cancelInlineEdit">取消</el-button>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :disabled="!editingDraft.trim()"
+                    @click="submitInlineEdit(item)"
+                  >
+                    重新发送
+                  </el-button>
+                </div>
+              </div>
               <AiMessage
+                v-else
                 :content="item.content"
                 :thinking="item.thinking"
                 :thinking-duration="item.thinkingDuration"
@@ -106,7 +144,7 @@
                 :interrupted="item.interrupted"
                 @source-click="handleSourceClick"
               />
-              <div class="message-actions-inline">
+              <div v-if="!isEditingMessage(item)" class="message-actions-inline">
                 <el-tooltip content="复制" placement="bottom">
                   <el-button link size="small" @click="copyMessage(item.content)">
                     <el-icon><DocumentCopy /></el-icon>
@@ -117,7 +155,7 @@
                     <el-icon><RefreshRight /></el-icon>
                   </el-button>
                 </el-tooltip>
-                <el-tooltip v-if="item.role === 'user' && isLastUserMessage(item)" content="编辑" placement="bottom">
+                <el-tooltip v-if="item.role === 'user' && isLastUserMessage(item) && !isEditingMessage(item)" content="编辑" placement="bottom">
                   <el-button link size="small" @click="editMessage(item)">
                     <el-icon><Edit /></el-icon>
                   </el-button>
@@ -241,6 +279,8 @@ const props = defineProps({
   inputDisabled: { type: Boolean, default: false },
   allowSpeech: { type: Boolean, default: true },
   speechLoading: { type: Boolean, default: false },
+  editingMessageId: { type: String, default: null },
+  titleEditable: { type: Boolean, default: false },
   
   // 布局配置
   showSidebarToggle: { type: Boolean, default: false },
@@ -253,6 +293,9 @@ const emit = defineEmits([
   'stop',
   'regenerate',
   'edit',
+  'edit-submit',
+  'edit-cancel',
+  'title-submit',
   'prompt-click',
   'source-click',
   'speech',
@@ -265,6 +308,11 @@ const selectedModel = ref(props.defaultModel)
 const messagesContainer = ref(null)
 const showScrollBtn = ref(false)
 const bubbleListKey = ref(0)
+const inlineEditInput = ref(null)
+const editingDraft = ref('')
+const titleInput = ref(null)
+const isEditingTitle = ref(false)
+const titleDraft = ref('')
 let userAtBottom = true
 
 // 计算属性
@@ -359,6 +407,33 @@ function handleSpeech() {
   emit('speech')
 }
 
+async function startTitleEdit() {
+  if (!props.titleEditable) return
+
+  titleDraft.value = props.title || ''
+  isEditingTitle.value = true
+  await nextTick()
+  const input = titleInput.value?.input
+  input?.focus()
+  input?.select()
+}
+
+function submitTitleEdit() {
+  const nextTitle = titleDraft.value.trim()
+  isEditingTitle.value = false
+  if (!nextTitle || nextTitle === props.title) return
+  emit('title-submit', nextTitle)
+}
+
+function cancelTitleEdit() {
+  isEditingTitle.value = false
+  titleDraft.value = props.title || ''
+}
+
+function isEditingMessage(item) {
+  return !!props.editingMessageId && props.editingMessageId === item.id
+}
+
 async function copyMessage(content) {
   try {
     await navigator.clipboard.writeText(content)
@@ -380,7 +455,19 @@ function regenerateMessage(item) {
 
 function editMessage(item) {
   emit('edit', item)
-  inputMessage.value = item.content
+}
+
+function submitInlineEdit(item) {
+  if (!editingDraft.value.trim()) return
+
+  emit('edit-submit', {
+    item,
+    content: editingDraft.value.trim()
+  })
+}
+
+function cancelInlineEdit() {
+  emit('edit-cancel')
 }
 
 function isLastMessage(item) {
@@ -438,6 +525,26 @@ watch(selectedModel, (val) => {
   emit('update:model', val)
 })
 
+watch(() => props.editingMessageId, async (val) => {
+  if (!val) {
+    editingDraft.value = ''
+    return
+  }
+
+  const target = props.messages.find(msg => msg.id === val)
+  editingDraft.value = target?.content || ''
+  await nextTick()
+  const textarea = inlineEditInput.value?.textarea
+  textarea?.focus()
+  textarea?.setSelectionRange(textarea.value.length, textarea.value.length)
+})
+
+watch(() => props.title, () => {
+  if (!isEditingTitle.value) {
+    titleDraft.value = props.title || ''
+  }
+})
+
 onMounted(() => {
   if (messagesContainer.value) {
     messagesContainer.value.addEventListener('scroll', onScroll)
@@ -451,6 +558,31 @@ onMounted(() => {
   flex-direction: column;
   height: 100%;
   background: linear-gradient(180deg, #FAFBFE 0%, #F3F1FF 50%, #EEEDF9 100%);
+}
+
+.inline-edit-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.08);
+
+  :deep(.el-textarea__inner) {
+    box-shadow: none;
+    border: none;
+    padding: 0;
+    min-height: 52px !important;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #1E1B4B;
+  }
+}
+
+.inline-edit-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .ai-chat-header {
@@ -479,6 +611,10 @@ onMounted(() => {
       -webkit-text-fill-color: transparent;
       background-clip: text;
       letter-spacing: -0.3px;
+
+      &.editable {
+        cursor: text;
+      }
     }
   }
   
@@ -535,6 +671,16 @@ onMounted(() => {
     gap: 8px;
     flex: 1;
     justify-content: flex-end;
+  }
+}
+
+.title-editor {
+  width: min(320px, 60vw);
+
+  :deep(.el-input__wrapper) {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.18) inset;
   }
 }
 

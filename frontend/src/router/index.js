@@ -16,27 +16,41 @@ const routes = [
   },
   {
     path: '/',
-    name: 'Chat',
     component: () => import('@/views/chat/ChatView.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'ChatHome',
+        component: () => import('@/views/chat/ChatPanelView.vue')
+      },
+      {
+        path: 'workspace',
+        name: 'Workspace',
+        component: () => import('@/views/workspace/WorkspaceView.vue')
+      },
+      {
+        path: 'workspace/model/:id',
+        name: 'ModelDetail',
+        component: () => import('@/views/workspace/ModelDetailView.vue')
+      },
+      {
+        path: 'knowledge',
+        name: 'Knowledge',
+        component: () => import('@/views/knowledge/KnowledgeView.vue')
+      },
+      {
+        path: 'kg',
+        name: 'KnowledgeGraph',
+        component: () => import('@/views/kg/KnowledgeGraphView.vue')
+      }
+    ]
   },
   {
-    path: '/workspace',
-    name: 'Workspace',
-    component: () => import('@/views/workspace/WorkspaceView.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/workspace/model/:id',
-    name: 'ModelDetail',
-    component: () => import('@/views/workspace/ModelDetailView.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/knowledge',
-    name: 'Knowledge',
-    component: () => import('@/views/knowledge/KnowledgeView.vue'),
-    meta: { requiresAuth: true }
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('@/views/admin/AdminView.vue'),
+    meta: { requiresAuth: true, adminOnly: true }
   }
 ]
 
@@ -46,13 +60,19 @@ const router = createRouter({
 })
 
 // Navigation guard
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchUser()
+  }
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login' })
+  } else if (to.meta.adminOnly && !authStore.isAdmin) {
+    next({ name: 'ChatHome' })
   } else if (to.meta.guest && authStore.isAuthenticated) {
-    next({ name: 'Chat' })
+    next({ name: 'ChatHome' })
   } else {
     next()
   }

@@ -18,6 +18,7 @@ class User(db.Model):
     avatar = db.Column(db.String(255), nullable=True)
     role = db.Column(db.Enum('user', 'admin', name='user_role'), default='user', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
@@ -42,6 +43,7 @@ class User(db.Model):
             'avatar': self.avatar,
             'role': self.role,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
         }
         if include_email:
             data['email'] = self.email

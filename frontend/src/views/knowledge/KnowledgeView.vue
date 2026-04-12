@@ -3,10 +3,6 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
-        <el-button @click="$router.push('/')" text class="back-btn">
-          <el-icon><ArrowLeft /></el-icon>
-          返回对话
-        </el-button>
         <h2 class="page-title">知识库管理</h2>
       </div>
       <el-button type="primary" @click="openCreateDialog()" class="primary-btn">
@@ -60,7 +56,7 @@
         </el-button>
       </div>
 
-      <el-empty v-if="!loading && knowledgeBases.length === 0" description="暂无知识库，点击创建开始使用" :image-size="100" />
+      <el-empty v-if="!loading && knowledgeBases.length === 0" class="page-empty" description="暂无知识库，点击创建开始使用" :image-size="100" />
     </div>
 
     <!-- 创建/编辑弹窗 -->
@@ -209,12 +205,13 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import {
-  Plus, ArrowLeft, FolderOpened, Document,
+  Plus, FolderOpened, Document,
   MoreFilled, UploadFilled, Edit, Delete, Upload, Check, Close
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as knowledgeApi from '@/api/knowledge'
 import * as fileApi from '@/api/file'
+import { getCache, setCache, invalidateCache } from '@/utils/cache'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -238,10 +235,18 @@ const statusMap = {
 }
 
 async function loadKnowledgeBases() {
-  loading.value = true
+  const cached = getCache('knowledge:bases')
+  if (cached) {
+    knowledgeBases.value = cached.data || cached || []
+    loading.value = false
+  } else {
+    loading.value = true
+  }
+
   try {
     const res = await knowledgeApi.getKnowledgeBases()
     knowledgeBases.value = res.data || []
+    setCache('knowledge:bases', res, 30 * 1000)
   } catch (e) {
     console.error(e)
   } finally {
@@ -273,6 +278,7 @@ async function saveKnowledgeBase() {
       await knowledgeApi.createKnowledgeBase(kbForm)
       ElMessage.success('已创建')
     }
+    invalidateCache('knowledge:bases')
     showCreateDialog.value = false
     loadKnowledgeBases()
   } catch (e) {
@@ -287,6 +293,7 @@ async function deleteKnowledgeBase(kb) {
     await ElMessageBox.confirm(`确定删除「${kb.name}」？所有数据将被清除`, '确认删除', { type: 'warning' })
     await knowledgeApi.deleteKnowledgeBase(kb.id)
     knowledgeBases.value = knowledgeBases.value.filter(k => k.id !== kb.id)
+    invalidateCache('knowledge:bases')
     ElMessage.success('已删除')
   } catch {}
 }
@@ -327,7 +334,7 @@ async function uploadFiles() {
   }
   uploading.value = false
   uploadList.value = []
-  if (ok) { ElMessage.success(`成功 ${ok} 个`); loadFiles(); loadKnowledgeBases() }
+  if (ok) { ElMessage.success(`成功 ${ok} 个`); invalidateCache('knowledge:bases'); loadFiles(); loadKnowledgeBases() }
   if (fail) ElMessage.error(`${fail} 个失败`)
 }
 
@@ -336,6 +343,7 @@ async function deleteFile(file) {
     await ElMessageBox.confirm('确定删除该文件？')
     await fileApi.deleteFile(file.id)
     currentFiles.value = currentFiles.value.filter(f => f.id !== file.id)
+    invalidateCache('knowledge:bases')
     loadKnowledgeBases()
     ElMessage.success('已删除')
   } catch {}
@@ -357,6 +365,7 @@ function pollStatus(file) {
       Object.assign(file, res.data)
       if (['completed', 'failed'].includes(res.data.status)) {
         clearInterval(timer)
+        invalidateCache('knowledge:bases')
         loadKnowledgeBases()
       }
     } catch { clearInterval(timer) }
@@ -378,7 +387,9 @@ onMounted(loadKnowledgeBases)
 // Sapphire Elegance Theme - 与主页会话页一致
 .page-container {
   padding: 24px 28px;
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
+  overflow: auto;
   background: linear-gradient(135deg, #FAFBFE 0%, #F3F1FF 50%, #EEEDF9 100%);
 }
 
@@ -392,24 +403,6 @@ onMounted(loadKnowledgeBases)
   .header-left {
     display: flex;
     align-items: center;
-    gap: 16px;
-  }
-
-  .back-btn {
-    color: #5B5580;
-    font-weight: 500;
-    padding: 8px 12px;
-    border-radius: 10px;
-    transition: all 0.25s ease;
-
-    &:hover {
-      color: #6366F1;
-      background: rgba(99, 102, 241, 0.08);
-    }
-
-    .el-icon {
-      margin-right: 6px;
-    }
   }
 }
 
@@ -448,6 +441,13 @@ onMounted(loadKnowledgeBases)
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 20px;
+  min-height: 360px;
+  align-content: start;
+}
+
+.page-empty {
+  grid-column: 1 / -1;
+  place-self: center;
 }
 
 .kb-card {

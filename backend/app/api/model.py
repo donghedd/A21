@@ -5,7 +5,7 @@ from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from . import model_bp
 from ..utils.response import success_response, error_response
-from ..models import CustomModel, KnowledgeBase, ModelKnowledgeBinding
+from ..models import CustomModel, ExternalModel, KnowledgeBase, ModelKnowledgeBinding
 from ..extensions import db
 from ..services import get_ollama_service
 
@@ -205,3 +205,31 @@ def unbind_knowledge_base(model_id, kb_id):
     except Exception as e:
         db.session.rollback()
         return error_response(400, str(e))
+
+
+@model_bp.route('/external', methods=['GET'])
+@jwt_required()
+def get_external_models():
+    """External API models are disabled"""
+    return error_response(403, 'External API models are disabled')
+
+
+@model_bp.route('/external', methods=['POST'])
+@jwt_required()
+def create_external_model():
+    """External API models are disabled"""
+    return error_response(403, 'External API models are disabled')
+
+
+@model_bp.route('/external/<model_id>', methods=['PUT'])
+@jwt_required()
+def update_external_model(model_id):
+    """External API models are disabled"""
+    return error_response(403, 'External API models are disabled')
+
+
+@model_bp.route('/external/<model_id>', methods=['DELETE'])
+@jwt_required()
+def delete_external_model(model_id):
+    """External API models are disabled"""
+    return error_response(403, 'External API models are disabled')
