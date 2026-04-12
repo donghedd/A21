@@ -356,7 +356,6 @@ watch(
   () => props.activeNode,
   value => {
     currentNode.value = value || null
-    renderChart()
   },
   { immediate: true, deep: true }
 )
