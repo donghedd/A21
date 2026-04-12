@@ -33,10 +33,6 @@
             @close-detail="handleCloseDetail"
           />
         </div>
-
-        <div class="resource-panel">
-          <PaperTable :paper-list="paperList" />
-        </div>
       </div>
     </template>
   </div>
@@ -47,7 +43,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FilterBar from './components/FilterBar.vue'
 import GraphChart from './components/GraphChart.vue'
-import PaperTable from './components/PaperTable.vue'
 import * as kgApi from '@/api/kg'
 
 const relationOptions = [
@@ -68,7 +63,6 @@ const allNodes = ref([])
 const allEdges = ref([])
 const currentNodeData = ref(null)
 const detailNode = ref(null)
-const paperList = ref([])
 const graphRef = ref(null)
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -80,7 +74,6 @@ const kgUnavailable = ref(false)
 const kgUnavailableMessage = ref('请检查技术图谱服务配置。')
 
 const nodeRelationsCache = ref(new Map())
-const nodeResourcesCache = ref(new Map())
 
 const displayNodes = computed(() => {
   if (currentNodeData.value) {
@@ -150,7 +143,6 @@ async function loadKeywordsAsNodes(keyword) {
     loading.value = true
     allNodes.value = []
     allEdges.value = []
-    paperList.value = []
     currentNodeData.value = null
     detailNode.value = null
     nodeRelationsCache.value.clear()
@@ -187,43 +179,10 @@ async function loadKeywordsAsNodes(keyword) {
   }
 }
 
-function processResourceResponse(resources = []) {
-  return resources.map(item => ({
-    id: item.id,
-    title: item.title || '未命名资料',
-    journal: item.journal || '本地图谱来源',
-    year: item.year,
-    link: item.url || '',
-    url: item.url || ''
-  }))
-}
-
-async function updatePaperListByNode(node) {
-  const nodeId = String(node.id)
-
-  if (nodeResourcesCache.value.has(nodeId)) {
-    paperList.value = nodeResourcesCache.value.get(nodeId)
-    return
-  }
-
-  try {
-    const res = await kgApi.getTechResources(nodeId)
-    const resourceList = processResourceResponse(res.data || [])
-    nodeResourcesCache.value.set(nodeId, resourceList)
-    paperList.value = resourceList
-  } catch (error) {
-    console.error('获取关联资料失败:', error)
-    paperList.value = []
-  }
-}
-
 async function loadNodeRelations(centerNode) {
   try {
     const relationKey = buildRelationCacheKey(centerNode.id)
-    if (nodeRelationsCache.value.has(relationKey)) {
-      await updatePaperListByNode(centerNode)
-      return
-    }
+    if (nodeRelationsCache.value.has(relationKey)) return
 
     let graphData = null
     if (!relationType.value && Number(depth.value) > 1) {
@@ -268,8 +227,6 @@ async function loadNodeRelations(centerNode) {
       nodes,
       edges
     })
-
-    await updatePaperListByNode(normalizedCenter)
   } catch (error) {
     console.error('获取节点关联失败:', error)
     ElMessage.error('获取节点关联关系失败')
@@ -277,7 +234,6 @@ async function loadNodeRelations(centerNode) {
       nodes: [normalizeTechNode(centerNode)],
       edges: []
     })
-    paperList.value = []
   }
 }
 
@@ -305,7 +261,6 @@ async function handleSearch() {
 async function handleResetView() {
   currentNodeData.value = null
   detailNode.value = null
-  paperList.value = []
   relationType.value = ''
   await loadKeywordsAsNodes()
   ElMessage.info('已重置视图')
@@ -384,19 +339,11 @@ onMounted(async () => {
 .content-shell {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
 }
 
 .graph-panel {
   flex: 1;
   min-height: 0;
-}
-
-.resource-panel {
-  height: 256px;
-  flex-shrink: 0;
 }
 
 .kg-unavailable {
@@ -411,10 +358,6 @@ onMounted(async () => {
 @media (max-width: 760px) {
   .tech-kg-page {
     padding: 12px;
-  }
-
-  .resource-panel {
-    height: 320px;
   }
 }
 </style>
