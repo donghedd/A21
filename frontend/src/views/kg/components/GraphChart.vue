@@ -72,14 +72,19 @@ const props = defineProps({
   activeNode: {
     type: Object,
     default: null
+  },
+  focusNodeId: {
+    type: String,
+    default: ''
   }
 })
 
-const emit = defineEmits(['node-click', 'close-detail'])
+const emit = defineEmits(['node-click', 'node-dblclick', 'close-detail'])
 
 const chartRef = ref(null)
 const currentNode = ref(null)
 let chart = null
+let clickTimer = null
 
 let currentZoomScale = 1
 const MIN_ZOOM = 0.8
@@ -105,7 +110,9 @@ function nodeColor(category = '') {
 }
 
 function buildChartNodes() {
-  const centerId = props.activeNode?.id
+  const centerId = props.focusNodeId
+  const centerX = chart ? chart.getWidth() / 2 : undefined
+  const centerY = chart ? chart.getHeight() / 2 : undefined
   return props.nodes.map((node, index) => {
     const isCenter = centerId ? node.id === centerId : index === 0
     const scale = isCenter ? 1.2 : 1
@@ -131,6 +138,9 @@ function buildChartNodes() {
         fontSize: BASE_FONT_SIZE * currentZoomScale + (isCenter ? 1 : 0),
         lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale
       },
+      fixed: Boolean(isCenter && centerId),
+      x: isCenter && centerId ? centerX : undefined,
+      y: isCenter && centerId ? centerY : undefined,
       isCenter
     }
   })
@@ -304,8 +314,21 @@ function initChart() {
 
   chart.on('click', params => {
     if (params.dataType === 'node' && params.data) {
-      currentNode.value = params.data
-      emit('node-click', params.data)
+      if (clickTimer) clearTimeout(clickTimer)
+      clickTimer = window.setTimeout(() => {
+        emit('node-click', params.data)
+        clickTimer = null
+      }, 220)
+    }
+  })
+
+  chart.on('dblclick', params => {
+    if (params.dataType === 'node' && params.data) {
+      if (clickTimer) {
+        clearTimeout(clickTimer)
+        clickTimer = null
+      }
+      emit('node-dblclick', params.data)
     }
   })
 
@@ -344,6 +367,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (clickTimer) {
+    clearTimeout(clickTimer)
+    clickTimer = null
+  }
   window.removeEventListener('resize', handleResize)
   chart?.dispose()
   chart = null

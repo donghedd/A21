@@ -29,7 +29,9 @@
             :nodes="displayNodes"
             :edges="displayEdges"
             :active-node="detailNode"
+            :focus-node-id="currentNodeData?._focusNodeId || ''"
             @node-click="handleNodeClick"
+            @node-dblclick="handleNodeDblClick"
             @close-detail="handleCloseDetail"
           />
         </div>
@@ -77,25 +79,31 @@ const nodeRelationsCache = ref(new Map())
 
 const displayNodes = computed(() => {
   if (currentNodeData.value) {
-    const cached = nodeRelationsCache.value.get(buildRelationCacheKey(currentNodeData.value.id))
+    const cacheKey = currentNodeData.value._relationKey || buildRelationCacheKey(currentNodeData.value.id)
+    const cached = nodeRelationsCache.value.get(cacheKey)
     return cached ? cached.nodes : []
   }
+
   if (searchKeyword.value.trim()) {
     const keyword = searchKeyword.value.trim().toLowerCase()
     return allNodes.value.filter(node => node.name.toLowerCase().includes(keyword))
   }
+
   return allNodes.value
 })
 
 const displayEdges = computed(() => {
   if (currentNodeData.value) {
-    const cached = nodeRelationsCache.value.get(buildRelationCacheKey(currentNodeData.value.id))
+    const cacheKey = currentNodeData.value._relationKey || buildRelationCacheKey(currentNodeData.value.id)
+    const cached = nodeRelationsCache.value.get(cacheKey)
     return cached ? cached.edges : []
   }
+
   if (searchKeyword.value.trim()) {
     const nodeIds = new Set(displayNodes.value.map(node => node.id))
     return allEdges.value.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target))
   }
+
   return allEdges.value
 })
 
@@ -105,6 +113,7 @@ function normalizeTechNode(node = {}, index = 0) {
   const name = node.name || node.text || properties.name || '未知节点'
   const degree = Number(node.degree || node.metrics?.citationCount || 0)
   const totalPapers = Number(node.totalPapers || node.metrics?.paperCount || 0)
+
   return {
     id: String(node.id),
     name,
@@ -136,6 +145,10 @@ function normalizeEdge(edge = {}) {
 
 function buildRelationCacheKey(nodeId) {
   return `${nodeId}|${depth.value}|${relationType.value || 'all'}`
+}
+
+function buildDirectRelationCacheKey(nodeId) {
+  return `${nodeId}|direct|${relationType.value || 'all'}`
 }
 
 async function loadKeywordsAsNodes(keyword) {
@@ -179,27 +192,26 @@ async function loadKeywordsAsNodes(keyword) {
   }
 }
 
-async function loadNodeRelations(centerNode) {
+async function loadNodeDetail(node) {
   try {
-    const relationKey = buildRelationCacheKey(centerNode.id)
-    if (nodeRelationsCache.value.has(relationKey)) return
+    const res = await kgApi.getKGNode(node.id)
+    return normalizeTechNode({ ...node, ...(res.data || {}) })
+  } catch (error) {
+    return normalizeTechNode(node)
+  }
+}
 
-    let graphData = null
-    if (!relationType.value && Number(depth.value) > 1) {
-      const graphRes = await kgApi.getTechVisualize({
-        q: centerNode.name,
-        depth: Number(depth.value)
-      })
-      graphData = graphRes.data
-    } else {
-      const relationRes = await kgApi.getTechRelations(centerNode.id, {
-        relation_type: relationType.value || undefined
-      })
-      graphData = relationRes.data
-    }
+async function loadDirectNodeRelations(centerNode) {
+  const relationKey = buildDirectRelationCacheKey(centerNode.id)
+  try {
+    if (nodeRelationsCache.value.has(relationKey)) return relationKey
 
-    const apiNodes = Array.isArray(graphData?.nodes) ? graphData.nodes : []
-    const apiEdges = Array.isArray(graphData?.edges) ? graphData.edges : []
+    const relationRes = await kgApi.getTechRelations(centerNode.id, {
+      relation_type: relationType.value || undefined
+    })
+    const graphData = relationRes.data || {}
+    const apiNodes = Array.isArray(graphData.nodes) ? graphData.nodes : []
+    const apiEdges = Array.isArray(graphData.edges) ? graphData.edges : []
 
     const normalizedCenter = normalizeTechNode(centerNode)
     const nodeMap = new Map([[normalizedCenter.id, normalizedCenter]])
@@ -210,7 +222,10 @@ async function loadNodeRelations(centerNode) {
     })
 
     const nodes = Array.from(nodeMap.values())
-    let edges = apiEdges.map(item => normalizeEdge(item))
+    const nodeIds = new Set(nodes.map(node => node.id))
+    let edges = apiEdges
+      .map(item => normalizeEdge(item))
+      .filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target))
 
     if (!edges.length && nodes.length > 1) {
       edges = nodes
@@ -223,35 +238,34 @@ async function loadNodeRelations(centerNode) {
         }))
     }
 
-    nodeRelationsCache.value.set(relationKey, {
-      nodes,
-      edges
-    })
+    nodeRelationsCache.value.set(relationKey, { nodes, edges })
+    return relationKey
   } catch (error) {
-    console.error('获取节点关联失败:', error)
-    ElMessage.error('获取节点关联关系失败')
-    nodeRelationsCache.value.set(buildRelationCacheKey(centerNode.id), {
+    console.error('获取直接关联失败:', error)
+    nodeRelationsCache.value.set(relationKey, {
       nodes: [normalizeTechNode(centerNode)],
       edges: []
     })
-  }
-}
-
-async function loadNodeDetail(node) {
-  try {
-    const res = await kgApi.getKGNode(node.id)
-    return normalizeTechNode({ ...node, ...(res.data || {}) })
-  } catch (error) {
-    return normalizeTechNode(node)
+    return relationKey
   }
 }
 
 async function handleNodeClick(node) {
   const normalized = normalizeTechNode(node)
+  detailNode.value = await loadNodeDetail(normalized)
+}
+
+async function handleNodeDblClick(node) {
+  const normalized = normalizeTechNode(node)
   const detail = await loadNodeDetail(normalized)
-  currentNodeData.value = detail
   detailNode.value = detail
-  await loadNodeRelations(detail)
+  const relationKey = await loadDirectNodeRelations(detail)
+  currentNodeData.value = {
+    ...detail,
+    _relationKey: relationKey,
+    _focusNodeId: detail.id
+  }
+  graphRef.value?.handleCenter()
 }
 
 async function handleSearch() {
@@ -304,8 +318,12 @@ async function loadKGHealth() {
 
 watch([relationType, depth], async () => {
   if (currentNodeData.value) {
-    nodeRelationsCache.value.delete(buildRelationCacheKey(currentNodeData.value.id))
-    await loadNodeRelations(currentNodeData.value)
+    const relationKey = await loadDirectNodeRelations(currentNodeData.value)
+    currentNodeData.value = {
+      ...currentNodeData.value,
+      _relationKey: relationKey,
+      _focusNodeId: currentNodeData.value.id
+    }
   }
 })
 
