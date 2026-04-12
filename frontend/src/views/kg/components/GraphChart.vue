@@ -5,7 +5,18 @@
 
       <div class="zoom-controls">
         <button type="button" class="zoom-btn" @click="zoomOut">−</button>
-        <button type="button" class="zoom-display" @click="resetZoom">{{ zoomPercent }}%</button>
+        <label class="zoom-display">
+          <input
+            v-model="zoomInput"
+            class="zoom-input"
+            type="text"
+            inputmode="numeric"
+            @focus="isEditingZoom = true"
+            @blur="commitZoomInput"
+            @keydown.enter.prevent="commitZoomInput"
+          />
+          <span class="zoom-unit">%</span>
+        </label>
         <button type="button" class="zoom-btn" @click="zoomIn">+</button>
       </div>
 
@@ -92,14 +103,16 @@ const currentNode = ref(null)
 let chart = null
 let clickTimer = null
 
-let currentZoomScale = 1
+const currentZoomScale = ref(1)
+const zoomInput = ref('100')
+const isEditingZoom = ref(false)
 const MIN_ZOOM = 0.01
 const MAX_ZOOM = 10
 const BASE_SYMBOL_SIZE = 50
 const BASE_FONT_SIZE = 10
 const BASE_LABEL_LINE_HEIGHT = 12
 
-const zoomPercent = computed(() => Math.round(currentZoomScale * 100))
+const zoomPercent = computed(() => Math.round(currentZoomScale.value * 100))
 
 function formatNodeType(labels = []) {
   return Array.isArray(labels) && labels.length ? labels.join(' / ') : 'Entity'
@@ -134,7 +147,7 @@ function buildChartNodes() {
       totalPapers: node.totalPapers,
       properties: node.properties,
       degree: node.degree,
-      symbolSize: BASE_SYMBOL_SIZE * currentZoomScale * scale,
+      symbolSize: BASE_SYMBOL_SIZE * scale,
       itemStyle: {
         color: nodeColor(node.category || node.labels?.[0]),
         borderColor: '#fff',
@@ -143,8 +156,8 @@ function buildChartNodes() {
         shadowColor: 'rgba(15, 23, 42, 0.15)'
       },
       label: {
-        fontSize: BASE_FONT_SIZE * currentZoomScale + (isCenter ? 1 : 0),
-        lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale
+        fontSize: BASE_FONT_SIZE * currentZoomScale.value + (isCenter ? 1 : 0),
+        lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale.value
       },
       fixed: Boolean(isCenter && centerId),
       x: isCenter && centerId ? centerX : undefined,
@@ -282,21 +295,16 @@ function closePopup() {
 
 function handleCenter() {
   if (!chart) return
-  chart.dispatchAction({
-    type: 'graphRoam',
-    zoom: 1,
-    originX: chart.getWidth() / 2,
-    originY: chart.getHeight() / 2
-  })
   chart.dispatchAction({ type: 'restore' })
-  currentZoomScale = 1
+  currentZoomScale.value = 1
+  zoomInput.value = '100'
   renderChart()
 }
 
 function setZoomScale(nextScale) {
   if (!chart) return
   const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale))
-  const ratio = clampedScale / currentZoomScale
+  const ratio = clampedScale / currentZoomScale.value
   if (!Number.isFinite(ratio) || Math.abs(ratio - 1) < 0.0001) return
   const width = chart.getWidth()
   const height = chart.getHeight()
@@ -320,6 +328,34 @@ function resetZoom() {
   setZoomScale(1)
 }
 
+function commitZoomInput() {
+  isEditingZoom.value = false
+  const raw = String(zoomInput.value || '').replace(/[^\d.]/g, '')
+  const percent = Number(raw)
+  if (!Number.isFinite(percent)) {
+    zoomInput.value = String(zoomPercent.value)
+    return
+  }
+  const clampedPercent = Math.min(1000, Math.max(1, percent))
+  zoomInput.value = String(Math.round(clampedPercent))
+  setZoomScale(clampedPercent / 100)
+}
+
+function applyLabelScale() {
+  if (!chart) return
+  chart.setOption({
+    series: [
+      {
+        id: 'mainGraph',
+        label: {
+          fontSize: BASE_FONT_SIZE * currentZoomScale.value,
+          lineHeight: BASE_LABEL_LINE_HEIGHT * currentZoomScale.value
+        }
+      }
+    ]
+  })
+}
+
 function handleResize() {
   chart?.resize()
 }
@@ -331,13 +367,14 @@ function initChart() {
 
   chart.on('graphRoam', params => {
     if (params.zoom != null) {
-      let newScale = currentZoomScale * params.zoom
+      let newScale = currentZoomScale.value * params.zoom
       if (newScale < MIN_ZOOM) newScale = MIN_ZOOM
       if (newScale > MAX_ZOOM) newScale = MAX_ZOOM
-      if (Math.abs(newScale - currentZoomScale) > 0.001) {
-        currentZoomScale = newScale
-        renderChart()
+      currentZoomScale.value = newScale
+      if (!isEditingZoom.value) {
+        zoomInput.value = String(Math.round(newScale * 100))
       }
+      applyLabelScale()
     }
   })
 
@@ -473,12 +510,29 @@ onUnmounted(() => {
 }
 
 .zoom-display {
-  min-width: 68px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 78px;
   height: 34px;
   padding: 0 12px;
   border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.zoom-input {
+  width: 38px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  outline: none;
+}
+
+.zoom-unit {
+  color: inherit;
 }
 
 .detail-popup {
