@@ -352,15 +352,22 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .graph-chart {
+  flex: 1;
   height: 100%;
+  min-height: 0;
+  display: flex;
   background: #f8fafc;
   padding: 16px;
+  overflow: hidden;
 }
 
 .graph-stage {
+  flex: 1;
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 0;
+  display: flex;
   border: 2px dashed rgba(203, 213, 225, 0.9);
   border-radius: 20px;
   overflow: hidden;
@@ -368,9 +375,10 @@ onUnmounted(() => {
 }
 
 .chart-canvas {
+  flex: 1;
   width: 100%;
   height: 100%;
-  min-height: 520px;
+  min-height: 0;
 }
 
 .detail-popup {

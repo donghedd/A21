@@ -326,11 +326,13 @@ onMounted(async () => {
 <style scoped lang="scss">
 .tech-kg-page {
   flex: 1;
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 16px 20px 20px;
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 28%),
     linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
@@ -338,16 +340,23 @@ onMounted(async () => {
 
 .content-shell {
   flex: 1;
+  height: 100%;
   min-height: 0;
+  display: flex;
+  overflow: hidden;
 }
 
 .graph-panel {
   flex: 1;
+  height: 100%;
   min-height: 0;
+  display: flex;
+  overflow: hidden;
 }
 
 .kg-unavailable {
   flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.94);
