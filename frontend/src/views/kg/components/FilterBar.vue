@@ -19,13 +19,6 @@
 
       <div class="select-group">
         <div class="field">
-          <span class="field-label">深度</span>
-          <el-select v-model="localDepth" class="field-input">
-            <el-option v-for="item in depthOptions" :key="item" :label="`${item}层`" :value="item" />
-          </el-select>
-        </div>
-
-        <div class="field">
           <span class="field-label">关系</span>
           <el-select v-model="localRelationType" class="field-input" clearable placeholder="全部关系">
             <el-option v-for="item in relationOptions" :key="item" :label="item" :value="item" />
@@ -35,8 +28,7 @@
     </div>
 
     <div class="filter-right">
-      <el-button plain @click="$emit('reset')">重置</el-button>
-      <el-button plain @click="$emit('zoom')">缩放</el-button>
+      <el-button plain @click="$emit('reset')">刷新</el-button>
       <el-button plain @click="$emit('center')">居中</el-button>
     </div>
   </div>
@@ -51,10 +43,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  depth: {
-    type: Number,
-    default: 2
-  },
   relationType: {
     type: String,
     default: ''
@@ -62,10 +50,6 @@ const props = defineProps({
   relationOptions: {
     type: Array,
     default: () => []
-  },
-  depthOptions: {
-    type: Array,
-    default: () => [1, 2, 3]
   },
   loading: {
     type: Boolean,
@@ -75,10 +59,8 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:keyword',
-  'update:depth',
   'update:relationType',
   'search',
-  'zoom',
   'center',
   'reset'
 ])
@@ -86,11 +68,6 @@ const emit = defineEmits([
 const localKeyword = computed({
   get: () => props.keyword,
   set: value => emit('update:keyword', value)
-})
-
-const localDepth = computed({
-  get: () => props.depth,
-  set: value => emit('update:depth', value)
 })
 
 const localRelationType = computed({

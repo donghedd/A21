@@ -3,6 +3,12 @@
     <div class="graph-stage">
       <div ref="chartRef" class="chart-canvas"></div>
 
+      <div class="zoom-controls">
+        <button type="button" class="zoom-btn" @click="zoomOut">−</button>
+        <button type="button" class="zoom-display" @click="resetZoom">{{ zoomPercent }}%</button>
+        <button type="button" class="zoom-btn" @click="zoomIn">+</button>
+      </div>
+
       <transition name="detail-fade">
         <div v-if="currentNode" class="detail-popup">
           <div class="detail-card">
@@ -57,7 +63,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 
 const props = defineProps({
@@ -87,11 +93,13 @@ let chart = null
 let clickTimer = null
 
 let currentZoomScale = 1
-const MIN_ZOOM = 0.8
-const MAX_ZOOM = 2
+const MIN_ZOOM = 0.01
+const MAX_ZOOM = 10
 const BASE_SYMBOL_SIZE = 50
 const BASE_FONT_SIZE = 10
 const BASE_LABEL_LINE_HEIGHT = 12
+
+const zoomPercent = computed(() => Math.round(currentZoomScale * 100))
 
 function formatNodeType(labels = []) {
   return Array.isArray(labels) && labels.length ? labels.join(' / ') : 'Entity'
@@ -274,21 +282,42 @@ function closePopup() {
 
 function handleCenter() {
   if (!chart) return
-  currentZoomScale = 1
+  chart.dispatchAction({
+    type: 'graphRoam',
+    zoom: 1,
+    originX: chart.getWidth() / 2,
+    originY: chart.getHeight() / 2
+  })
   chart.dispatchAction({ type: 'restore' })
+  currentZoomScale = 1
   renderChart()
 }
 
-function handleZoom() {
+function setZoomScale(nextScale) {
   if (!chart) return
+  const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale))
+  const ratio = clampedScale / currentZoomScale
+  if (!Number.isFinite(ratio) || Math.abs(ratio - 1) < 0.0001) return
   const width = chart.getWidth()
   const height = chart.getHeight()
   chart.dispatchAction({
     type: 'graphRoam',
-    zoom: 1.2,
+    zoom: ratio,
     originX: width / 2,
     originY: height / 2
   })
+}
+
+function zoomIn() {
+  setZoomScale((zoomPercent.value + 10) / 100)
+}
+
+function zoomOut() {
+  setZoomScale((zoomPercent.value - 10) / 100)
+}
+
+function resetZoom() {
+  setZoomScale(1)
 }
 
 function handleResize() {
@@ -340,8 +369,7 @@ function initChart() {
 }
 
 defineExpose({
-  handleCenter,
-  handleZoom
+  handleCenter
 })
 
 watch(
@@ -405,6 +433,52 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   min-height: 0;
+}
+
+.zoom-controls {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.zoom-btn,
+.zoom-display {
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.zoom-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.zoom-btn:hover,
+.zoom-display:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #2563eb;
+}
+
+.zoom-display {
+  min-width: 68px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .detail-popup {

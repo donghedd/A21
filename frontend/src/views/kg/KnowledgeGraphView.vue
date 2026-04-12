@@ -11,14 +11,11 @@
     <template v-else>
       <FilterBar
         v-model:keyword="searchKeyword"
-        v-model:depth="depth"
         v-model:relation-type="relationType"
-        :depth-options="depthOptions"
         :relation-options="relationOptions"
         :loading="loading"
         @search="handleSearch"
         @center="handleCenterGraph"
-        @zoom="handleZoomGraph"
         @reset="handleResetView"
       />
 
@@ -59,8 +56,6 @@ const relationOptions = [
   'COVERS'
 ]
 
-const depthOptions = [1, 2, 3]
-
 const allNodes = ref([])
 const allEdges = ref([])
 const currentNodeData = ref(null)
@@ -69,7 +64,6 @@ const graphRef = ref(null)
 const loading = ref(false)
 const searchKeyword = ref('')
 const relationType = ref('')
-const depth = ref(Number(import.meta.env.VITE_KG_TECH_MAX_DEPTH || 2))
 
 const kgHealth = ref(null)
 const kgUnavailable = ref(false)
@@ -144,7 +138,7 @@ function normalizeEdge(edge = {}) {
 }
 
 function buildRelationCacheKey(nodeId) {
-  return `${nodeId}|${depth.value}|${relationType.value || 'all'}`
+  return `${nodeId}|${relationType.value || 'all'}`
 }
 
 function buildDirectRelationCacheKey(nodeId) {
@@ -284,10 +278,6 @@ function handleCenterGraph() {
   graphRef.value?.handleCenter()
 }
 
-function handleZoomGraph() {
-  graphRef.value?.handleZoom()
-}
-
 function handleCloseDetail() {
   detailNode.value = null
 }
@@ -316,7 +306,7 @@ async function loadKGHealth() {
   }
 }
 
-watch([relationType, depth], async () => {
+watch(relationType, async () => {
   if (currentNodeData.value) {
     const relationKey = await loadDirectNodeRelations(currentNodeData.value)
     currentNodeData.value = {
