@@ -66,6 +66,7 @@
           <el-dropdown
             v-for="conv in conversations"
             :key="conv.id"
+            :ref="(el) => setConversationDropdownRef(conv.id, el)"
             trigger="contextmenu"
             placement="right-start"
             @command="(cmd) => onConversationCommand(cmd, conv)"
@@ -74,6 +75,7 @@
               class="conv-item"
               :class="{ active: conv.id === currentConversationId }"
               @click="selectConversation(conv.id)"
+              @contextmenu.prevent.stop="openConversationMenu(conv.id)"
             >
               <el-icon class="conv-icon"><ChatDotRound /></el-icon>
               <span class="conv-title">{{ conv.title || '新对话' }}</span>
@@ -291,7 +293,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Plus,
@@ -344,6 +346,8 @@ const showSearchDialog = ref(false)
 const showUserSwitchDialog = ref(false)
 const editingMessageId = ref(null)
 const editingSnapshot = ref(null)
+const openConversationMenuId = ref(null)
+const conversationDropdownRefs = new Map()
 
 // 默认提示
 const defaultPrompts = [
@@ -368,6 +372,7 @@ function isRouteActive(prefix) {
 async function navigateToPanel(path) {
   if (route.path === path) return
 
+  closeConversationMenu()
   showSearchDialog.value = false
   sourceDialogVisible.value = false
 
@@ -375,6 +380,7 @@ async function navigateToPanel(path) {
 }
 
 async function openSearchDialog() {
+  closeConversationMenu()
   if (route.name !== 'ChatHome') {
     await router.push({ name: 'ChatHome' })
   }
@@ -387,6 +393,53 @@ async function openSearchDialog() {
 function clearEditState() {
   editingMessageId.value = null
   editingSnapshot.value = null
+}
+
+function setConversationDropdownRef(conversationId, instance) {
+  if (!instance) {
+    conversationDropdownRefs.delete(conversationId)
+    return
+  }
+  conversationDropdownRefs.set(conversationId, instance)
+}
+
+function closeConversationMenu() {
+  const currentId = openConversationMenuId.value
+  if (currentId) {
+    const currentDropdown = conversationDropdownRefs.get(currentId)
+    currentDropdown?.handleClose?.()
+  }
+  openConversationMenuId.value = null
+}
+
+async function openConversationMenu(conversationId) {
+  if (openConversationMenuId.value === conversationId) {
+    closeConversationMenu()
+    await nextTick()
+  } else if (openConversationMenuId.value) {
+    closeConversationMenu()
+    await nextTick()
+  }
+
+  openConversationMenuId.value = conversationId
+  const nextDropdown = conversationDropdownRefs.get(conversationId)
+  nextDropdown?.handleOpen?.()
+}
+
+function handleGlobalPointerDown(event) {
+  if (!openConversationMenuId.value) return
+
+  const target = event.target
+  if (!(target instanceof Element)) {
+    closeConversationMenu()
+    return
+  }
+
+  if (target.closest('.conversation-list .el-dropdown')) return
+  if (target.closest('.el-dropdown-menu')) return
+  if (target.closest('.el-popper')) return
+
+  closeConversationMenu()
 }
 
 function restoreEditedMessages() {
@@ -485,6 +538,7 @@ async function loadConversations() {
 }
 
 async function createNewChat() {
+  closeConversationMenu()
   clearEditState()
   currentConversationId.value = null
   messages.value = []
@@ -512,6 +566,7 @@ async function deleteConversation(id) {
 }
 
 async function selectConversation(id) {
+  closeConversationMenu()
   if (editingMessageId.value) {
     clearEditState()
   }
@@ -874,10 +929,12 @@ function showSourceDetail(source) {
 }
 
 function toggleSidebar() {
+  closeConversationMenu()
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
 function onConversationCommand(command, conversation) {
+  closeConversationMenu()
   if (command === 'rename') {
     handleRename(conversation)
     return
@@ -997,9 +1054,14 @@ function prefetchWorkspaceRoutes() {
 
 // 生命周期
 onMounted(() => {
+  document.addEventListener('pointerdown', handleGlobalPointerDown)
   loadConversations()
   loadModels()
   prefetchWorkspaceRoutes()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', handleGlobalPointerDown)
 })
 </script>
 
