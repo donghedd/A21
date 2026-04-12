@@ -16,20 +16,12 @@
         </el-input>
         <el-button type="primary" :loading="loading" @click="handleSearch">搜索</el-button>
       </div>
-
-      <div class="select-group">
-        <div class="field">
-          <span class="field-label">关系</span>
-          <el-select v-model="localRelationType" class="field-input" clearable placeholder="全部关系">
-            <el-option v-for="item in relationOptions" :key="item" :label="item" :value="item" />
-          </el-select>
-        </div>
-      </div>
     </div>
 
     <div class="filter-right">
       <el-button plain @click="$emit('reset')">刷新</el-button>
       <el-button plain @click="$emit('center')">居中</el-button>
+      <el-button plain @click="$emit('settings')">设置</el-button>
     </div>
   </div>
 </template>
@@ -43,14 +35,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  relationType: {
-    type: String,
-    default: ''
-  },
-  relationOptions: {
-    type: Array,
-    default: () => []
-  },
   loading: {
     type: Boolean,
     default: false
@@ -59,20 +43,15 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:keyword',
-  'update:relationType',
   'search',
   'center',
-  'reset'
+  'reset',
+  'settings'
 ])
 
 const localKeyword = computed({
   get: () => props.keyword,
   set: value => emit('update:keyword', value)
-})
-
-const localRelationType = computed({
-  get: () => props.relationType,
-  set: value => emit('update:relationType', value || '')
 })
 
 function handleSearch() {
@@ -121,22 +100,6 @@ function handleSearch() {
   flex: 1;
 }
 
-.select-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.field-input {
-  width: 128px;
-}
-
 .filter-right {
   display: flex;
   align-items: center;
@@ -163,7 +126,6 @@ function handleSearch() {
     align-items: stretch;
   }
 
-  .select-group,
   .filter-right {
     flex-wrap: wrap;
   }

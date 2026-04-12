@@ -11,12 +11,11 @@
     <template v-else>
       <FilterBar
         v-model:keyword="searchKeyword"
-        v-model:relation-type="relationType"
-        :relation-options="relationOptions"
         :loading="loading"
         @search="handleSearch"
         @center="handleCenterGraph"
         @reset="handleResetView"
+        @settings="settingsVisible = true"
       />
 
       <div class="content-shell">
@@ -33,6 +32,36 @@
           />
         </div>
       </div>
+
+      <el-drawer
+        v-model="settingsVisible"
+        direction="rtl"
+        size="340px"
+        :with-header="false"
+        class="settings-drawer"
+      >
+        <div class="drawer-body">
+          <div class="drawer-title">图谱设置</div>
+
+          <div class="drawer-block">
+            <div class="drawer-label">显示关系</div>
+            <el-checkbox-group v-model="selectedRelationTypes" class="drawer-grid">
+              <el-checkbox v-for="item in relationOptions" :key="item" :label="item">
+                {{ item }}
+              </el-checkbox>
+            </el-checkbox-group>
+          </div>
+
+          <div class="drawer-block">
+            <div class="drawer-label">显示实体类型</div>
+            <el-checkbox-group v-model="selectedEntityTypes" class="drawer-grid">
+              <el-checkbox v-for="item in entityOptions" :key="item" :label="item">
+                {{ item }}
+              </el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </div>
+      </el-drawer>
     </template>
   </div>
 </template>
@@ -62,8 +91,10 @@ const currentNodeData = ref(null)
 const detailNode = ref(null)
 const graphRef = ref(null)
 const loading = ref(false)
+const settingsVisible = ref(false)
 const searchKeyword = ref('')
-const relationType = ref('')
+const selectedRelationTypes = ref([...relationOptions])
+const selectedEntityTypes = ref([])
 
 const kgHealth = ref(null)
 const kgUnavailable = ref(false)
@@ -71,34 +102,93 @@ const kgUnavailableMessage = ref('请检查技术图谱服务配置。')
 
 const nodeRelationsCache = ref(new Map())
 
+const entityOptions = computed(() => {
+  const values = new Set()
+
+  ;(kgHealth.value?.labels || []).forEach(item => {
+    const label = item?.label
+    if (label && label !== 'Book') values.add(label)
+  })
+
+  allNodes.value.forEach(node => {
+    if (node.category && node.category !== 'Book') values.add(node.category)
+    ;(node.labels || []).forEach(label => {
+      if (label && label !== 'Book') values.add(label)
+    })
+  })
+
+  return Array.from(values).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+
+watch(entityOptions, options => {
+  if (!options.length) return
+  if (!selectedEntityTypes.value.length) {
+    selectedEntityTypes.value = [...options]
+    return
+  }
+  selectedEntityTypes.value = selectedEntityTypes.value.filter(item => options.includes(item))
+  if (!selectedEntityTypes.value.length) {
+    selectedEntityTypes.value = [...options]
+  }
+}, { immediate: true })
+
+function filterGraph(nodes = [], edges = [], focusId = '') {
+  const activeEntityTypes = new Set(selectedEntityTypes.value)
+  const activeRelationTypes = new Set(selectedRelationTypes.value)
+
+  const filteredNodes = (nodes || []).filter(node => {
+    if (focusId && node.id === focusId) return true
+    if (!activeEntityTypes.size) return true
+    return activeEntityTypes.has(node.category || node.labels?.[0] || '')
+  })
+
+  const visibleNodeIds = new Set(filteredNodes.map(node => node.id))
+  const filteredEdges = (edges || []).filter(edge => {
+    const typeAllowed = !activeRelationTypes.size || activeRelationTypes.has(edge.type || edge.relationType)
+    return typeAllowed && visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+  })
+
+  const connectedNodeIds = new Set(filteredEdges.flatMap(edge => [edge.source, edge.target]))
+  const finalNodes = filteredNodes.filter(node => {
+    if (focusId && node.id === focusId) return true
+    return !filteredEdges.length ? visibleNodeIds.has(node.id) : connectedNodeIds.has(node.id)
+  })
+
+  return {
+    nodes: finalNodes,
+    edges: filteredEdges
+  }
+}
+
 const displayNodes = computed(() => {
   if (currentNodeData.value) {
     const cacheKey = currentNodeData.value._relationKey || buildRelationCacheKey(currentNodeData.value.id)
     const cached = nodeRelationsCache.value.get(cacheKey)
-    return cached ? cached.nodes : []
+    return cached ? filterGraph(cached.nodes, cached.edges, currentNodeData.value.id).nodes : []
   }
 
   if (searchKeyword.value.trim()) {
     const keyword = searchKeyword.value.trim().toLowerCase()
-    return allNodes.value.filter(node => node.name.toLowerCase().includes(keyword))
+    const nodes = allNodes.value.filter(node => node.name.toLowerCase().includes(keyword))
+    return filterGraph(nodes, []).nodes
   }
 
-  return allNodes.value
+  return filterGraph(allNodes.value, []).nodes
 })
 
 const displayEdges = computed(() => {
   if (currentNodeData.value) {
     const cacheKey = currentNodeData.value._relationKey || buildRelationCacheKey(currentNodeData.value.id)
     const cached = nodeRelationsCache.value.get(cacheKey)
-    return cached ? cached.edges : []
+    return cached ? filterGraph(cached.nodes, cached.edges, currentNodeData.value.id).edges : []
   }
 
   if (searchKeyword.value.trim()) {
     const nodeIds = new Set(displayNodes.value.map(node => node.id))
-    return allEdges.value.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+    return filterGraph([], allEdges.value).edges.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target))
   }
 
-  return allEdges.value
+  return filterGraph([], allEdges.value).edges
 })
 
 function normalizeTechNode(node = {}, index = 0) {
@@ -138,11 +228,11 @@ function normalizeEdge(edge = {}) {
 }
 
 function buildRelationCacheKey(nodeId) {
-  return `${nodeId}|${relationType.value || 'all'}`
+  return `${nodeId}|all`
 }
 
 function buildDirectRelationCacheKey(nodeId) {
-  return `${nodeId}|direct|${relationType.value || 'all'}`
+  return `${nodeId}|direct`
 }
 
 async function loadKeywordsAsNodes(keyword) {
@@ -200,9 +290,7 @@ async function loadDirectNodeRelations(centerNode) {
   try {
     if (nodeRelationsCache.value.has(relationKey)) return relationKey
 
-    const relationRes = await kgApi.getTechRelations(centerNode.id, {
-      relation_type: relationType.value || undefined
-    })
+    const relationRes = await kgApi.getTechRelations(centerNode.id)
     const graphData = relationRes.data || {}
     const apiNodes = Array.isArray(graphData.nodes) ? graphData.nodes : []
     const apiEdges = Array.isArray(graphData.edges) ? graphData.edges : []
@@ -269,9 +357,10 @@ async function handleSearch() {
 async function handleResetView() {
   currentNodeData.value = null
   detailNode.value = null
-  relationType.value = ''
+  selectedRelationTypes.value = [...relationOptions]
+  selectedEntityTypes.value = [...entityOptions.value]
   await loadKeywordsAsNodes()
-  ElMessage.info('已重置视图')
+  ElMessage.info('已刷新图谱')
 }
 
 function handleCenterGraph() {
@@ -306,7 +395,7 @@ async function loadKGHealth() {
   }
 }
 
-watch(relationType, async () => {
+watch([selectedRelationTypes, selectedEntityTypes], async () => {
   if (currentNodeData.value) {
     const relationKey = await loadDirectNodeRelations(currentNodeData.value)
     currentNodeData.value = {
@@ -370,6 +459,40 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.94);
   border-radius: 20px;
   border: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.settings-drawer :deep(.el-drawer) {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.drawer-body {
+  padding: 24px;
+}
+
+.drawer-title {
+  margin-bottom: 22px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.drawer-block {
+  margin-bottom: 28px;
+}
+
+.drawer-label {
+  margin-bottom: 12px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drawer-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 @media (max-width: 760px) {

@@ -372,6 +372,8 @@ function handleResize() {
 function initChart() {
   if (!chartRef.value) return
   chart = echarts.init(chartRef.value)
+  currentZoomScale.value = 1
+  zoomInput.value = '100'
   renderChart()
 
   chart.on('graphRoam', params => {
