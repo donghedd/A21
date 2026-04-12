@@ -9,20 +9,6 @@
     </div>
 
     <template v-else>
-      <header class="page-switcher">
-        <div class="graph-tabs">
-          <button class="graph-tab active" type="button">技术图谱</button>
-          <button class="graph-tab" type="button" @click="showUnavailableGraph('学者图谱')">学者图谱</button>
-          <button class="graph-tab" type="button" @click="showUnavailableGraph('机构图谱')">机构图谱</button>
-        </div>
-
-        <div class="mode-indicator">
-          <span class="mode-label">当前模式：</span>
-          <span v-if="!currentNodeData" class="mode-value">全部节点</span>
-          <span v-else class="mode-value active">{{ currentNodeData.name }}及其关联节点</span>
-        </div>
-      </header>
-
       <FilterBar
         v-model:keyword="searchKeyword"
         v-model:depth="depth"
@@ -157,10 +143,6 @@ function normalizeEdge(edge = {}) {
 
 function buildRelationCacheKey(nodeId) {
   return `${nodeId}|${depth.value}|${relationType.value || 'all'}`
-}
-
-function showUnavailableGraph(name) {
-  ElMessage.info(`${name}暂未迁移，当前仅启用技术图谱`)
 }
 
 async function loadKeywordsAsNodes(keyword) {
@@ -399,67 +381,6 @@ onMounted(async () => {
     linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
 }
 
-.page-switcher {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 20px;
-  padding: 16px 20px 0;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 18px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
-}
-
-.graph-tabs {
-  display: flex;
-  gap: 28px;
-}
-
-.graph-tab {
-  position: relative;
-  padding: 0 0 14px;
-  border: none;
-  background: transparent;
-  color: #64748b;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.graph-tab.active {
-  color: #2563eb;
-}
-
-.graph-tab.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  border-radius: 999px 999px 0 0;
-  background: #2563eb;
-}
-
-.mode-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 12px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.mode-value {
-  color: #2563eb;
-  font-weight: 700;
-}
-
-.mode-value.active {
-  color: #7c3aed;
-}
-
 .content-shell {
   flex: 1;
   min-height: 0;
@@ -487,21 +408,9 @@ onMounted(async () => {
   border: 1px solid rgba(226, 232, 240, 0.92);
 }
 
-@media (max-width: 1180px) {
-  .page-switcher {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
 @media (max-width: 760px) {
   .tech-kg-page {
     padding: 12px;
-  }
-
-  .graph-tabs {
-    gap: 18px;
-    flex-wrap: wrap;
   }
 
   .resource-panel {
