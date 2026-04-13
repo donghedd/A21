@@ -277,31 +277,44 @@ class ChatService:
         Returns: (context_text, sources)
         Enhanced to return structured sources with file_name and section_path
         """
+        logger.info(f"=== RAG检索开始 ===")
+        logger.info(f"查询: {query[:50]}...")
+        logger.info(f"自定义模型ID: {custom_model_id}")
+
         if not custom_model_id:
+            logger.warning("没有提供custom_model_id，跳过RAG检索")
             return '', []
-        
+
         # Get bound knowledge bases
         bindings = ModelKnowledgeBinding.query.filter_by(
             custom_model_id=custom_model_id
         ).all()
-        
+
+        logger.info(f"找到 {len(bindings)} 个知识库绑定")
+
         if not bindings:
+            logger.warning(f"模型 {custom_model_id} 没有绑定任何知识库")
             return '', []
-        
+
         # Get collection names
         collection_names = []
         for binding in bindings:
             kb = KnowledgeBase.query.get(binding.knowledge_base_id)
             if kb:
                 collection_names.append(kb.collection_name)
-        
+                logger.info(f"绑定知识库: {kb.name} (collection: {kb.collection_name})")
+
         if not collection_names:
+            logger.warning("知识库集合名称为空")
             return '', []
-        
+
         # Query RAG service with configurable top_k
         rag_top_k = current_app.config.get('RAG_TOP_K', 10)
         enable_multi_source = current_app.config.get('RAG_ENABLE_MULTI_SOURCE', True)
-        
+
+        logger.info(f"RAG参数: top_k={rag_top_k}, multi_source={enable_multi_source}")
+        logger.info(f"查询集合: {collection_names}")
+
         results = self.rag_service.query(
             query=query,
             collection_names=collection_names,
@@ -309,8 +322,11 @@ class ChatService:
             enable_rerank=True,
             enable_multi_source=enable_multi_source
         )
-        
+
+        logger.info(f"RAG检索结果数量: {len(results) if results else 0}")
+
         if not results:
+            logger.warning("RAG检索未返回任何结果")
             return '', []
         
         # Format context and structured sources with multi-source grouping
@@ -365,17 +381,17 @@ class ChatService:
         
         return context_text, sources
     
-    def build_prompt_with_context(self, user_message: str, context: str, 
+    def build_prompt_with_context(self, user_message: str, context: str,
                                   sources: list = None,
                                   system_prompt: str = None) -> List[Dict[str, str]]:
         """
         Build messages with RAG context using OpenWebUI-style citation
         """
         messages = []
-        
+
         # System message
         system_content = system_prompt or "You are a helpful AI assistant."
-        
+
         # If we have sources, use OpenWebUI-style RAG template
         if sources and len(sources) > 0:
             # Use the new format_rag_prompt function
@@ -384,7 +400,7 @@ class ChatService:
                 sources=sources,
                 system_prompt=None  # We'll prepend system_content manually
             )
-            
+
             # Prepend to system content
             system_content += f"\n\n{rag_prompt}"
         elif context:
@@ -399,10 +415,34 @@ You have access to the following reference information. Use it to answer questio
 
 When using information from the context, cite the source number (e.g., [1]) at the end of your response.
 If the context doesn't contain relevant information, answer based on your general knowledge."""
-        
+        else:
+            # 关键修复：当没有检索到任何内容时，明确告知AI不要编造答案
+            system_content += """
+
+### 重要提示：
+当前问题被识别为需要从知识库检索的问题，但知识库中没有找到相关内容。
+
+**你必须遵守以下规则：**
+1. **不要编造任何信息** - 不要提供虚假的来源、文档名称或案例编号
+2. **不要引用不存在的来源** - 不要使用 [1], [2] 等引用标记
+3. **诚实回答** - 明确告知用户知识库中没有找到相关信息
+4. **可以提供建议** - 可以建议用户检查知识库内容或尝试其他关键词
+
+**禁止行为：**
+- 编造虚假的参考文档（如《船舶电机维护手册》）
+- 编造虚假的案例编号（如 MAR-2022-045）
+- 编造虚假的引用标准（如 IEC 60034-1:2020）
+- 提供看似专业但实际虚构的详细技术信息
+
+**正确回答示例：**
+"抱歉，我在知识库中没有找到关于'电机过热'的相关信息。请确保：
+1. 知识库中已上传相关文档
+2. 文档已完成索引处理
+3. 尝试使用不同的关键词提问"""
+
         messages.append({'role': 'system', 'content': system_content})
         messages.append({'role': 'user', 'content': user_message})
-        
+
         return messages
 
     def _build_system_prompt(self, user_message: str, system_prompt: str = None) -> List[Dict[str, str]]:
@@ -443,7 +483,7 @@ If the context doesn't contain relevant information, answer based on your genera
             if not conversation:
                 yield self._sse_event('error', {'message': 'Conversation not found'})
                 return
-            
+
             # Resolve custom model settings with priority:
             # 1. Explicit custom_model_id from request
             # 2. Conversation's bound custom_model_id
@@ -452,72 +492,70 @@ If the context doesn't contain relevant information, answer based on your genera
             system_prompt = None
             base_model = model or 'qwen3:14b'
             effective_custom_model_id = custom_model_id or conversation.custom_model_id
-            
+
+            logger.info(f"=== Chat Stream Started ===")
+            logger.info(f"用户消息: {user_message[:50]}...")
+            logger.info(f"请求中的custom_model_id: {custom_model_id}")
+            logger.info(f"对话中的custom_model_id: {conversation.custom_model_id}")
+            logger.info(f"effective_custom_model_id: {effective_custom_model_id}")
+            logger.info(f"base_model: {base_model}")
+
             if effective_custom_model_id:
                 custom_model = CustomModel.query.get(effective_custom_model_id)
                 if custom_model:
+                    logger.info(f"找到自定义模型: {custom_model.name}")
                     base_model = custom_model.base_model or base_model
                     system_prompt = custom_model.system_prompt
                     # Sync conversation's custom_model_id if changed
                     if conversation.custom_model_id != effective_custom_model_id:
                         conversation.custom_model_id = effective_custom_model_id
                         db.session.commit()
-            
+                        logger.info(f"更新对话的custom_model_id为: {effective_custom_model_id}")
+                else:
+                    logger.warning(f"未找到自定义模型: {effective_custom_model_id}")
+
             # Save user message
             user_msg = self.add_message(conversation_id, 'user', user_message)
 
             # Immediately notify client that processing has started
             yield self._sse_event('status', {'message': 'Processing...'})
 
-            # Stage 1 & 2: Parallel classification and RAG context retrieval
-            # This reduces latency by doing both operations concurrently
-            from concurrent.futures import ThreadPoolExecutor, as_completed
+            # Stage 1 & 2: Classification and RAG context retrieval
+            # Note: Removed ThreadPoolExecutor due to Flask app context issues in threads
+            # Sequential execution is more reliable for database operations
+            from flask import current_app
 
-            def classify_question():
-                """Classify question in background thread"""
-                try:
-                    classifier = QuestionClassifier(self.llm_service)
-                    return classifier.classify(user_message, base_model)
-                except Exception as e:
-                    logger.warning(f"Classification failed: {e}")
-                    return {'type': 'KNOWLEDGE', 'keywords': []}
-
-            def get_context():
-                """Get RAG context in background thread"""
-                try:
-                    if effective_custom_model_id:
-                        return self.get_rag_context(user_message, effective_custom_model_id)
-                    return '', []
-                except Exception as e:
-                    logger.warning(f"RAG context retrieval failed: {e}")
-                    return '', []
-
-            # Execute classification and context retrieval in parallel
             classification = {'type': 'KNOWLEDGE', 'keywords': []}
             context, sources = '', []
 
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                classify_future = executor.submit(classify_question)
-                context_future = executor.submit(get_context)
+            # Step 1: Classify question
+            try:
+                classifier = QuestionClassifier(self.llm_service)
+                classification = classifier.classify(user_message, base_model)
+                question_type = classification.get('type', 'KNOWLEDGE')
+                logger.info(f"Question classified as: {question_type}")
+            except Exception as e:
+                logger.warning(f"Classification failed: {e}")
+                classification = {'type': 'KNOWLEDGE', 'keywords': []}
 
-                # Wait for both to complete
-                for future in as_completed([classify_future, context_future]):
-                    try:
-                        result = future.result()
-                        if future == classify_future:
-                            classification = result
-                            question_type = classification.get('type', 'KNOWLEDGE')
-                            logger.info(f"Question classified as: {question_type}")
-                        else:
-                            context, sources = result
-                    except Exception as e:
-                        logger.error(f"Parallel processing error: {e}")
+            # Step 2: Get RAG context (only for KNOWLEDGE type questions)
+            if classification.get('type', 'KNOWLEDGE') == 'KNOWLEDGE' and effective_custom_model_id:
+                try:
+                    context, sources = self.get_rag_context(user_message, effective_custom_model_id)
+                    logger.info(f"RAG检索完成: context长度={len(context)}, sources数量={len(sources) if sources else 0}")
+                except Exception as e:
+                    logger.warning(f"RAG context retrieval failed: {e}")
+                    context, sources = '', []
 
             question_type = classification.get('type', 'KNOWLEDGE')
             keywords = classification.get('keywords', [])
 
+            logger.info(f"问题分类结果: type={question_type}, keywords={keywords}")
+            logger.info(f"RAG检索状态: context长度={len(context)}, sources数量={len(sources) if sources else 0}")
+
             # Stage 3: Build messages based on classification
             if question_type == 'SYSTEM':
+                logger.info("使用SYSTEM模式（不检索知识库）")
                 yield self._sse_event('status', {'message': 'Generating response...'})
                 messages = self._build_system_prompt(user_message, system_prompt)
                 history = self.get_conversation_history(conversation_id, limit=2)
@@ -528,8 +566,12 @@ If the context doesn't contain relevant information, answer based on your genera
                             break
 
             elif question_type == 'KNOWLEDGE':
+                logger.info(f"使用KNOWLEDGE模式，sources数量: {len(sources) if sources else 0}")
                 if sources:
+                    logger.info(f"发送sources事件，包含 {len(sources)} 个来源")
                     yield self._sse_event('sources', {'sources': sources})
+                else:
+                    logger.warning("没有检索到任何sources，将提示AI不要编造答案")
                 yield self._sse_event('status', {'message': 'Generating response...'})
                 history = self.get_conversation_history(conversation_id, limit=10)
                 messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
@@ -538,6 +580,7 @@ If the context doesn't contain relevant information, answer based on your genera
                         messages.insert(1, msg)
 
             else:
+                logger.info("使用GENERAL模式")
                 yield self._sse_event('status', {'message': 'Generating response...'})
                 messages = self._build_system_prompt(user_message, system_prompt)
             

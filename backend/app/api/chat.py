@@ -149,14 +149,22 @@ def send_message(conversation_id):
     """
     user_id = get_jwt_identity()
     data = request.get_json()
-    
+
     if not data or not data.get('content'):
         return error_response(400, 'Message content is required')
-    
+
     user_message = data['content']
     model = data.get('model')  # Optional model override
     custom_model_id = data.get('custom_model_id')  # Optional custom model
-    
+
+    # 调试日志
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"=== API收到消息 ===")
+    logger.info(f"用户消息: {user_message[:50]}...")
+    logger.info(f"model参数: {model}")
+    logger.info(f"custom_model_id参数: {custom_model_id}")
+
     chat_service = get_chat_service()
     app = current_app._get_current_object()
     
