@@ -130,24 +130,35 @@
 
     <!-- 主聊天区域 -->
     <main class="chat-main">
-      <AiChat
-        :title="currentConversationTitle"
-        :messages="messages"
-        :is-streaming="isCurrentConversationStreaming"
-        :models="availableModels"
-        :default-model="selectedModel"
-        :user-name="user?.username"
-        :show-sidebar-toggle="sidebarCollapsed"
-        :sidebar-collapsed="sidebarCollapsed"
-        :prompts="defaultPrompts"
-        @send="handleSend"
-        @stop="handleStop"
-        @regenerate="handleRegenerate"
-        @edit="handleEdit"
-        @source-click="showSourceDetail"
-        @update:model="selectedModel = $event"
-        @update:sidebar-collapsed="sidebarCollapsed = $event"
-      />
+      <router-view v-if="isChatHomeRoute" v-slot="{ Component }">
+        <component
+          :is="Component"
+          class="panel-route-view"
+          :title="currentConversationTitle"
+          :messages="messages"
+          :is-streaming="isCurrentConversationStreaming"
+          :models="availableModels"
+          :default-model="selectedModel"
+          :user-name="user?.username"
+          :show-sidebar-toggle="sidebarCollapsed"
+          :sidebar-collapsed="sidebarCollapsed"
+          :prompts="defaultPrompts"
+          :editing-message-id="editingMessageId"
+          @send="handleSend"
+          @stop="handleStop"
+          @regenerate="handleRegenerate"
+          @edit="handleEdit"
+          @edit-submit="handleEditSubmit"
+          @edit-cancel="handleEditCancel"
+          @title-submit="handleTitleSubmit"
+          @source-click="showSourceDetail"
+          @update:model="selectedModel = $event"
+          @update:sidebarCollapsed="sidebarCollapsed = $event"
+        />
+      </router-view>
+      <router-view v-else v-slot="{ Component }">
+        <component :is="Component" class="panel-route-view" />
+      </router-view>
     </main>
 
     <!-- 来源详情弹窗 -->
@@ -283,8 +294,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import {
   Plus,
   ChatRound,
@@ -312,7 +323,6 @@ import { useAuthStore } from '@/stores/auth'
 import { useStreaming } from '@/composables/useStreaming'
 import { useConversationStorage } from '@/composables/useConversationStorage'
 import { useGlobalStreaming } from '@/composables/useGlobalStreaming'
-import { AiChat } from '@/components/ai'
 import * as chatApi from '@/api/chat'
 import * as modelApi from '@/api/model'
 import { getItem, setItem } from '@/utils/storage'
@@ -632,6 +642,10 @@ let selectConversationTimeout = null
 let isLoadingConversation = false
 
 async function selectConversation(id) {
+  if (route.name !== 'ChatHome') {
+    await router.push({ name: 'ChatHome' })
+  }
+
   if (currentConversationId.value === id) return
   if (isLoadingConversation) return
 
@@ -1688,6 +1702,20 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   background: transparent;
+}
+
+.chat-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.panel-route-view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .source-detail {
