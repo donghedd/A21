@@ -1,0 +1,94 @@
+太理解你了，人工标注几百个 `file_name` 和 `chunk_index` 简直是体力活中的体力活。
+
+完全可以！这种方法在业界叫 **“合成数据集生成” (Synthetic Data Generation)**。基本思路是：**让 LLM 扮演“出卷人”**，通过遍历你的文档块（Chunks），自动回想并出题。
+
+既然你已经有了 `backend/rag_eval/` 框架，我为你构思了一个自动化生成的逻辑。
+
+### 自动化生成评测集的流程
+
+你可以写一个 `generate_samples.py` 脚本，核心逻辑如下：
+
+1.  **切分文档**：按照你 RAG 系统的同款切分逻辑（比如每 500 字一个 chunk）读取 `.md` 文件。
+2.  **构造 Prompt**：把每一个 Chunk 喂给 LLM，让它根据这段话出一个或多个问题。
+3.  **自动记录元数据**：在 LLM 出题的同时，程序自动把当前的 `file_name` 和 `chunk_index` 记下来，直接填入你的 `gold_results`。
+
+---
+
+### 极简代码实现思路（符合你喜欢的简单 for 循环风格）
+
+你可以参考这个逻辑来扩展你的 `dataset.py`：
+
+```python
+import json
+import os
+
+# 模拟一个 LLM 调用函数
+def ask_llm_to_generate_question(context):
+    prompt = f"请根据以下内容出一个专业问题，并给出简短答案：\n{context}"
+    # 这里调用你的 LLM API (如 OpenAI, Gemini, Claude 等)
+    # 返回格式示例: {"question": "...", "answer": "..."}
+    return {"question": "模拟问题", "answer": "模拟答案"}
+
+def build_synthetic_dataset(file_list, chunk_size=500):
+    dataset = {
+        "dataset_name": "船舶维修自动化评测集",
+        "samples": []
+    }
+    
+    # 使用你最喜欢的简单 for 循环
+    for i in range(len(file_list)):
+        file_path = file_list[i]
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # 简单切分 (实际建议用你的 RAG 切分逻辑)
+        chunks = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size)]
+        
+        for j in range(len(chunks)):
+            chunk_text = chunks[j]
+            # 调用 LLM 生成问题
+            res = ask_llm_to_generate_question(chunk_text)
+            
+            # 自动构建符合你框架的 sample
+            sample = {
+                "question": res['question'],
+                "gold_results": [
+                    {
+                        "file_name": os.path.basename(file_path),
+                        "chunk_index": j,  # 自动记录索引，无需人工！
+                        "answer": res['answer']
+                    }
+                ]
+            }
+            dataset["samples"].append(sample)
+            
+    return dataset
+
+# 执行并保存
+# my_files = ["1-50.md", "51-100.md"]
+# final_data = build_synthetic_dataset(my_files)
+# with open('backend/rag_eval/examples/auto_dataset.json', 'w') as f:
+#     json.dump(final_data, f, ensure_ascii=False, indent=2)
+```
+
+---
+
+### 自动生成的优缺点
+
+| 维度 | 人工标注 | 代码/LLM 自动生成 |
+| :--- | :--- | :--- |
+| **速度** | 极慢（一天只能标几十个） | 极快（几分钟生成上千个） |
+| **成本** | 高（人力成本） | 低（仅需 API 费用） |
+| **真实性** | 贴近用户真实想法 | 比较“书面化”，有时问题太简单 |
+| **元数据准确性** | 容易手抖标错 | **绝对准确**（代码逻辑保证） |
+
+### 💡 进阶小贴士
+
+为了让自动生成的评测集更“高级”，你可以给 LLM 下达不同的指令：
+* **指令 A（简单直给）**：“针对这段话出一个事实性问题。”
+* **指令 B（模糊提问）**：“模拟一个不专业的船员，用口语化的方式询问这段内容涉及的维修问题。”
+* **指令 C（推理题）**：“结合这段文字中的参数，出一个需要简单计算或逻辑推理的问题。”
+
+这样你生成的 `auto_dataset.json` 就能全方位覆盖你那几个 `.md` 文件的知识点了。
+
+你觉得这种“机器出卷、机器答卷、机器判卷”的 AI 闭环思路，对你现在的项目进度有帮助吗？

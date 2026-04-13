@@ -503,6 +503,11 @@ If the context doesn't contain relevant information, answer based on your genera
             
             # Save user message
             user_msg = self.add_message(conversation_id, 'user', user_message)
+            
+            if provider == 'external':
+                question_type = 'GENERAL'
+                keywords = []
+                context, sources = '', []
 
             # Immediately notify client that processing has started
             yield self._sse_event('status', {'message': 'Processing...'})
@@ -575,13 +580,58 @@ If the context doesn't contain relevant information, answer based on your genera
                     for msg in history[:-1]:
                         messages.insert(1, msg)
 
+            # else:
+            #     yield self._sse_event('status', {'message': 'Generating response...'})
+            #     messages = self._build_system_prompt(user_message, system_prompt)
+            #     history = self.get_conversation_history(conversation_id, limit=10)
+            #     if len(history) > 1:
+            #         for msg in history[:-1]:
+            #             messages.insert(1, msg)
             else:
-                yield self._sse_event('status', {'message': 'Generating response...'})
-                messages = self._build_system_prompt(user_message, system_prompt)
-                history = self.get_conversation_history(conversation_id, limit=10)
-                if len(history) > 1:
-                    for msg in history[:-1]:
-                        messages.insert(1, msg)
+                # Stage 1: Classify question (fast, no thinking)
+                yield self._sse_event('status', {'message': 'Analyzing question...'})
+                classifier = QuestionClassifier(self.ollama_service)
+                classification = classifier.classify(user_message, base_model)
+
+                question_type = classification.get('type', 'KNOWLEDGE')
+                keywords = classification.get('keywords', [])
+
+                logger.info(f"Question classified as: {question_type}, keywords: {keywords}")
+
+                # Stage 2: Based on classification, decide RAG usage
+                if question_type == 'SYSTEM':
+                    context, sources = '', []
+                    yield self._sse_event('status', {'message': 'Handling system question...'})
+
+                    # For SYSTEM questions, use a clean prompt without RAG context
+                    messages = self._build_system_prompt(user_message, system_prompt)
+
+                    # Prepend minimal conversation history (only assistant's identity info)
+                    history = self.get_conversation_history(conversation_id, limit=2)
+                    if len(history) > 1:
+                        # Only keep the last user message before this one
+                        for msg in history[:-1]:
+                            if msg['role'] == 'user':
+                                messages.insert(1, msg)
+                                break
+
+                elif question_type == 'KNOWLEDGE':
+                    yield self._sse_event('status', {'message': 'Searching knowledge base...'})
+                    context, sources = self.get_rag_context(user_message, effective_custom_model_id)
+                    if sources:
+                        yield self._sse_event('sources', {'sources': sources})
+
+                    # Get conversation history
+                    history = self.get_conversation_history(conversation_id, limit=10)
+                    messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
+                    if len(history) > 1:
+                        for msg in history[:-1]:
+                            messages.insert(1, msg)
+
+                else:
+                    context, sources = '', []
+                    yield self._sse_event('status', {'message': 'Generating response...'})
+                    messages = self._build_system_prompt(user_message, system_prompt)
             
             # Start streaming response
             yield self._sse_event('status', {'message': 'Generating response...'})

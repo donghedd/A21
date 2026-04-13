@@ -66,16 +66,16 @@
           <el-dropdown
             v-for="conv in conversations"
             :key="conv.id"
-            :ref="(el) => setConversationDropdownRef(conv.id, el)"
+            :visible="openConversationMenuId === conv.id"
             trigger="contextmenu"
             placement="right-start"
+            @visible-change="(visible) => onConversationMenuVisibleChange(conv.id, visible)"
             @command="(cmd) => onConversationCommand(cmd, conv)"
           >
             <div
               class="conv-item"
               :class="{ active: conv.id === currentConversationId }"
               @click="selectConversation(conv.id)"
-              @contextmenu.prevent.stop="openConversationMenu(conv.id)"
             >
               <el-icon class="conv-icon"><ChatDotRound /></el-icon>
               <span class="conv-title">{{ conv.title || '新对话' }}</span>
@@ -332,26 +332,6 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const streaming = useStreaming()
-const conversationStorage = useConversationStorage()
-const globalStreaming = useGlobalStreaming()
-
-// Track if we're currently processing a stream for the visible conversation
-const isProcessingStream = computed(() => {
-  return globalStreaming.hasActiveStream(currentConversationId.value)
-})
-
-// Check if current conversation has an active stream (for input disabling)
-const isCurrentConversationStreaming = computed(() => {
-  const currentId = currentConversationId.value
-  if (!currentId) return false
-
-  // Check if this specific conversation has an active stream
-  const hasStream = globalStreaming.hasActiveStream(currentId)
-  if (hasStream) return true
-
-  // Also check if any message in current conversation is streaming
-  return messages.value.some(m => m.isStreaming)
-})
 
 // 状态
 const user = computed(() => authStore.user)
@@ -370,7 +350,6 @@ const showUserSwitchDialog = ref(false)
 const editingMessageId = ref(null)
 const editingSnapshot = ref(null)
 const openConversationMenuId = ref(null)
-const conversationDropdownRefs = new Map()
 
 // 默认提示
 const defaultPrompts = [
@@ -418,35 +397,19 @@ function clearEditState() {
   editingSnapshot.value = null
 }
 
-function setConversationDropdownRef(conversationId, instance) {
-  if (!instance) {
-    conversationDropdownRefs.delete(conversationId)
-    return
-  }
-  conversationDropdownRefs.set(conversationId, instance)
-}
-
 function closeConversationMenu() {
-  const currentId = openConversationMenuId.value
-  if (currentId) {
-    const currentDropdown = conversationDropdownRefs.get(currentId)
-    currentDropdown?.handleClose?.()
-  }
   openConversationMenuId.value = null
 }
 
-async function openConversationMenu(conversationId) {
-  if (openConversationMenuId.value === conversationId) {
-    closeConversationMenu()
-    await nextTick()
-  } else if (openConversationMenuId.value) {
-    closeConversationMenu()
-    await nextTick()
+function onConversationMenuVisibleChange(conversationId, visible) {
+  if (visible) {
+    openConversationMenuId.value = conversationId
+    return
   }
 
-  openConversationMenuId.value = conversationId
-  const nextDropdown = conversationDropdownRefs.get(conversationId)
-  nextDropdown?.handleOpen?.()
+  if (openConversationMenuId.value === conversationId) {
+    openConversationMenuId.value = null
+  }
 }
 
 function handleGlobalPointerDown(event) {
@@ -529,78 +492,34 @@ async function loadModels() {
 
     availableModels.value = [...customList, ...ollamaList]
 
-    // Initialize default model selection
-    initializeDefaultModel()
+    if (!selectedModel.value && availableModels.value.length > 0) {
+      const savedDefault = getItem('sfqa_default_model')
+      if (savedDefault && availableModels.value.some(m => m.id === savedDefault)) {
+        selectedModel.value = savedDefault
+      } else {
+        selectedModel.value = availableModels.value[0].id
+      }
+      setItem('sfqa_default_model', selectedModel.value)
+    }
   } catch (error) {
     console.error('Failed to load models:', error)
     availableModels.value = [{ id: 'qwen3:14b', name: 'qwen3:14b', type: 'ollama' }]
     if (!selectedModel.value) {
       selectedModel.value = 'qwen3:14b'
-    }
-  }
-}
-
-/**
- * Initialize default model based on priority:
- * 1. User's saved default (if still available)
- * 2. First available model from the list
- */
-function initializeDefaultModel() {
-  if (availableModels.value.length === 0) return
-
-  const savedDefault = getItem('sfqa_default_model')
-
-  // Check if saved default is still available (works for both ollama and custom models)
-  if (savedDefault) {
-    const isSavedDefaultAvailable = availableModels.value.some(m => m.id === savedDefault)
-    if (isSavedDefaultAvailable) {
-      if (!selectedModel.value) {
-        selectedModel.value = savedDefault
-      }
-      return
-    }
-  }
-
-  // No saved default or it's no longer available, use first available model
-  if (!selectedModel.value) {
-    const firstModel = availableModels.value[0]
-    selectedModel.value = firstModel.id
-    // Auto-save first model as default for new users
-    if (!savedDefault) {
-      setItem('sfqa_default_model', firstModel.id)
+      setItem('sfqa_default_model', 'qwen3:14b')
     }
   }
 }
 
 async function loadConversations() {
   try {
-    // First, load from localStorage for instant display
-    const localConversations = conversationStorage.loadConversationsList()
-    if (localConversations && localConversations.length > 0) {
-      conversations.value = localConversations
-    }
-
-    // Then fetch from server/cache
     const cached = await getOrFetch('conversations:list',
       () => chatApi.getConversations({ per_page: 50 }),
       CACHE_TTL.CONVERSATIONS
     )
-    const serverConversations = cached?.data?.conversations || cached?.conversations || []
-
-    // Update if different
-    if (JSON.stringify(conversations.value) !== JSON.stringify(serverConversations)) {
-      conversations.value = serverConversations
-    }
-
-    // Sync to localStorage
-    conversationStorage.syncConversationsFromServer(serverConversations)
+    conversations.value = cached?.data?.conversations || cached?.conversations || []
   } catch (error) {
     console.error('Failed to load conversations:', error)
-    // Fallback to localStorage on error
-    const localConversations = conversationStorage.loadConversationsList()
-    if (localConversations) {
-      conversations.value = localConversations
-    }
   }
 }
 
@@ -621,11 +540,6 @@ async function deleteConversation(id) {
     })
     await chatApi.deleteConversation(id)
     conversations.value = conversations.value.filter(c => c.id !== id)
-
-    // Also delete from localStorage
-    conversationStorage.deleteConversation(id)
-    conversationStorage.saveConversationsList(conversations.value)
-
     invalidateCache('conversations:list')
     invalidateCache(`conversations:messages:${id}`)
     if (currentConversationId.value === id) {
@@ -637,10 +551,6 @@ async function deleteConversation(id) {
   } catch {}
 }
 
-// Debounce utility for selectConversation
-let selectConversationTimeout = null
-let isLoadingConversation = false
-
 async function selectConversation(id) {
   if (route.name !== 'ChatHome') {
     await router.push({ name: 'ChatHome' })
@@ -649,175 +559,40 @@ async function selectConversation(id) {
   if (currentConversationId.value === id) return
   if (isLoadingConversation) return
 
-  // Clear any pending selection
-  if (selectConversationTimeout) {
-    clearTimeout(selectConversationTimeout)
-  }
+  currentConversationId.value = id
 
-  // Debounce the selection to prevent rapid clicking
-  selectConversationTimeout = setTimeout(async () => {
-    isLoadingConversation = true
-    const previousId = currentConversationId.value
-    currentConversationId.value = id
-
-    // Update global visible conversation
-    const activeStream = globalStreaming.setVisibleConversation(id)
-
-    // Clear messages immediately for better UX (prevents showing old messages)
+  try {
+    const cached = await getOrFetch(`conversations:messages:${id}`,
+      () => chatApi.getConversation(id),
+      CACHE_TTL.MESSAGES
+    )
+    messages.value = (cached?.data?.messages || cached?.messages || []).map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      thinking: msg.thinking_content,
+      thinkingDuration: msg.thinking_duration,
+      sources: msg.sources,
+      created_at: msg.created_at
+    }))
+  } catch (error) {
     messages.value = []
-
-    try {
-      // Check if there's an active stream for this conversation
-      if (activeStream && activeStream.isStreaming) {
-        // Load all historical messages from localStorage first
-        const allLocalMessages = conversationStorage.loadConversationMessages(id) || []
-
-        // Filter out the last incomplete assistant message if exists
-        const historicalMessages = allLocalMessages.filter(m => {
-          // Keep all messages except the one that's currently streaming
-          if (m.role === 'assistant' && m.isStreaming) {
-            return false
-          }
-          return true
-        })
-
-        // Build complete message list: historical + current streaming
-        const streamMessages = [...historicalMessages]
-
-        // Add the current streaming assistant message from global state
-        streamMessages.push({
-          id: activeStream.messageId || 'streaming-assistant',
-          role: 'assistant',
-          content: activeStream.content,
-          thinking: activeStream.thinking,
-          thinkingDuration: activeStream.thinkingDuration,
-          sources: activeStream.sources,
-          isStreaming: true,
-          loading: !activeStream.content,
-          created_at: new Date().toISOString()
-        })
-
-        messages.value = streamMessages
-
-        // Register callbacks to receive updates
-        globalStreaming.registerCallbacks(id, {
-          onContent: (content) => {
-            const assistantMsg = messages.value.find(m => m.role === 'assistant')
-            if (assistantMsg) {
-              assistantMsg.content = content
-              assistantMsg.loading = false
-            }
-          },
-          onThinking: (thinking) => {
-            const assistantMsg = messages.value.find(m => m.role === 'assistant')
-            if (assistantMsg) {
-              assistantMsg.thinking = thinking
-            }
-          },
-          onThinkingStart: () => {
-            const assistantMsg = messages.value.find(m => m.role === 'assistant')
-            if (assistantMsg) {
-              assistantMsg.isThinking = true
-            }
-          },
-          onThinkingEnd: (duration) => {
-            const assistantMsg = messages.value.find(m => m.role === 'assistant')
-            if (assistantMsg) {
-              assistantMsg.isThinking = false
-              assistantMsg.thinkingDuration = duration
-            }
-          },
-          onSources: (sources) => {
-            const assistantMsg = messages.value.find(m => m.role === 'assistant')
-            if (assistantMsg) {
-              assistantMsg.sources = sources
-            }
-          },
-          onDone: (result) => {
-            const assistantMsg = messages.value.find(m => m.role === 'assistant')
-            if (assistantMsg) {
-              assistantMsg.id = result.messageId || assistantMsg.id
-              assistantMsg.content = result.content
-              assistantMsg.thinking = result.thinking
-              assistantMsg.thinkingDuration = result.thinkingDuration
-              assistantMsg.sources = result.sources || []
-              assistantMsg.isStreaming = false
-              assistantMsg.loading = false
-            }
-            // Refresh conversation list
-            loadConversations()
-          },
-          onError: (error) => {
-            ElMessage.error(error || '生成失败')
-          }
-        })
-
-        isLoadingConversation = false
-        return
-      }
-
-      // Check localStorage cache first for instant display
-      const localMessages = conversationStorage.loadConversationMessages(id)
-
-      if (localMessages && localMessages.length > 0) {
-        // Show cached messages immediately
-        messages.value = localMessages
-      }
-
-      // Then fetch from server/cache
-      const cached = await getOrFetch(`conversations:messages:${id}`,
-        () => chatApi.getConversation(id),
-        CACHE_TTL.MESSAGES
-      )
-
-      const newMessages = (cached?.data?.messages || cached?.messages || []).map(msg => ({
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        thinking: msg.thinking_content,
-        thinkingDuration: msg.thinking_duration,
-        sources: msg.sources,
-        created_at: msg.created_at
-      }))
-
-      // Only update if different (prevents unnecessary re-renders)
-      if (JSON.stringify(messages.value) !== JSON.stringify(newMessages)) {
-        messages.value = newMessages
-      }
-
-      // Sync to localStorage
-      conversationStorage.syncMessagesFromServer(id, newMessages)
-    } catch (error) {
-      console.error('Failed to load conversation:', error)
-      if (messages.value.length === 0) {
-        ElMessage.error('加载对话失败')
-      }
-    } finally {
-      isLoadingConversation = false
-    }
-  }, 50) // Small delay to batch rapid clicks
+    ElMessage.error('加载对话失败')
+  }
 }
 
 async function handleSend({ content, model }) {
-  const conversationId = currentConversationId.value
-
-  if (!conversationId) {
+  if (!currentConversationId.value) {
     try {
       const res = await chatApi.createConversation({ title: content.slice(0, 50) })
       const conv = res.data
       conversations.value.unshift(conv)
       currentConversationId.value = conv.id
-
-      // Save new conversation to localStorage
-      conversationStorage.saveConversation(conv)
-      conversationStorage.saveConversationsList(conversations.value)
     } catch (error) {
       ElMessage.error('创建对话失败')
       return
     }
   }
-
-  const currentId = currentConversationId.value
 
   // 添加用户消息
   const userMessageId = 'temp-' + Date.now()
@@ -826,15 +601,11 @@ async function handleSend({ content, model }) {
     role: 'user',
     content,
     created_at: new Date().toISOString()
-  }
-  messages.value.push(userMessage)
-
-  // Save user message to localStorage immediately
-  conversationStorage.appendMessage(currentId, userMessage)
+  })
 
   // 添加临时的助手消息用于流式显示
   const assistantMessageId = 'temp-assistant-' + Date.now()
-  const assistantMessage = {
+  messages.value.push({
     id: assistantMessageId,
     role: 'assistant',
     content: '',
@@ -845,34 +616,6 @@ async function handleSend({ content, model }) {
     isStreaming: true,
     loading: true,
     interrupted: false
-  }
-  messages.value.push(assistantMessage)
-
-  // Save initial assistant message to localStorage
-  conversationStorage.appendMessage(currentId, assistantMessage)
-
-  // Start global stream tracking
-  globalStreaming.startStream(currentId, {
-    userMessageId,
-    messageId: assistantMessageId
-  })
-
-  // Track last localStorage save time
-  let lastLocalSave = Date.now()
-  const localSaveInterval = 1000 // Save every 1 second during streaming
-
-  // Register callbacks for global streaming
-  globalStreaming.registerCallbacks(currentId, {
-    onContent: (content) => {
-      // This will be called even when viewing other conversations
-      // The content is already updated in global state
-    },
-    onDone: (result) => {
-      // Stream completed
-    },
-    onError: (error) => {
-      // Stream errored
-    }
   })
 
   try {
@@ -881,11 +624,8 @@ async function handleSend({ content, model }) {
     const modelParam = modelInfo?.type === 'ollama' ? model : null
     const customModelIdParam = modelInfo?.type === 'custom' ? model : null
 
-    // Store abort controller in global state
-    globalStreaming.setAbortController(currentId, streaming.abortController)
-
     const response = await chatApi.sendMessageStream(
-      currentId,
+      currentConversationId.value,
       content,
       modelParam,
       customModelIdParam,
@@ -894,99 +634,38 @@ async function handleSend({ content, model }) {
 
     await streaming.processStream(response, {
       onContent: (chunk, fullContent) => {
-        // Update global state
-        globalStreaming.updateStreamContent(currentId, fullContent)
-
-        // Update local message if this conversation is visible
+        // 实时更新助手消息内容
         const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        const isVisible = currentConversationId.value === currentId
-
         if (assistantMsg) {
           assistantMsg.content = fullContent
+          // 有内容后关闭加载状态
           if (fullContent && assistantMsg.loading) {
             assistantMsg.loading = false
           }
         }
-
-        // Always save to localStorage regardless of visibility
-        // This ensures messages are preserved when switching conversations
-        const now = Date.now()
-        if (now - lastLocalSave >= localSaveInterval) {
-          if (isVisible) {
-            // Current conversation is visible, save from messages array
-            conversationStorage.saveConversationMessages(currentId, messages.value)
-          } else {
-            // Conversation is not visible, load existing messages and update
-            const existingMessages = conversationStorage.loadConversationMessages(currentId) || []
-            const updatedMessages = existingMessages.map(m => {
-              if (m.id === assistantMessageId) {
-                return { ...m, content: fullContent, loading: false }
-              }
-              return m
-            })
-            conversationStorage.saveConversationMessages(currentId, updatedMessages)
-          }
-          lastLocalSave = now
-        }
       },
       onThinking: (chunk, fullThinking) => {
-        // Update global state
-        globalStreaming.updateStreamThinking(currentId, fullThinking)
-
-        // Update local message if this conversation is visible
+        // 实时更新思考内容
         const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        const isVisible = currentConversationId.value === currentId
-
         if (assistantMsg) {
           assistantMsg.thinking = fullThinking
+          // 有思考内容后关闭加载状态
           if (fullThinking && assistantMsg.loading) {
             assistantMsg.loading = false
           }
         }
-
-        // Also update localStorage for background conversations
-        if (!isVisible) {
-          const existingMessages = conversationStorage.loadConversationMessages(currentId) || []
-          const updatedMessages = existingMessages.map(m => {
-            if (m.id === assistantMessageId) {
-              return { ...m, thinking: fullThinking }
-            }
-            return m
-          })
-          conversationStorage.saveConversationMessages(currentId, updatedMessages)
-        }
       },
-      onThinkingStart: () => {
-        globalStreaming.markThinkingStarted(currentId)
-      },
+      onThinkingStart: () => {},
       onThinkingEnd: (duration) => {
-        globalStreaming.markThinkingEnded(currentId, duration)
-
         const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
         if (assistantMsg) {
           assistantMsg.thinkingDuration = duration
         }
       },
       onSources: (sources) => {
-        globalStreaming.updateStreamSources(currentId, sources)
-
         const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        const isVisible = currentConversationId.value === currentId
-
         if (assistantMsg) {
           assistantMsg.sources = sources
-        }
-
-        // Also update localStorage for background conversations
-        if (!isVisible) {
-          const existingMessages = conversationStorage.loadConversationMessages(currentId) || []
-          const updatedMessages = existingMessages.map(m => {
-            if (m.id === assistantMessageId) {
-              return { ...m, sources }
-            }
-            return m
-          })
-          conversationStorage.saveConversationMessages(currentId, updatedMessages)
         }
       },
       onDone: (result) => {
@@ -1016,52 +695,21 @@ async function handleSend({ content, model }) {
           assistantMsg.interrupted = result.aborted
         }
 
-        // Final save to localStorage with complete data
-        if (isVisible) {
-          conversationStorage.saveConversationMessages(currentId, messages.value)
-        } else {
-          // For background conversations, update the saved messages
-          const existingMessages = conversationStorage.loadConversationMessages(currentId) || []
-          const updatedMessages = existingMessages.map(m => {
-            if (m.id === assistantMessageId) {
-              return {
-                ...m,
-                id: result.messageId || assistantMessageId,
-                content: result.content,
-                thinking: result.thinking,
-                thinkingDuration: result.thinkingDuration,
-                sources: result.sources || [],
-                isStreaming: false,
-                loading: false,
-                interrupted: result.aborted
-              }
-            }
-            return m
-          })
-          conversationStorage.saveConversationMessages(currentId, updatedMessages)
-        }
-
         if (result.aborted) {
           ElMessage.info('已终止生成')
         }
 
         streaming.reset()
-        invalidateCache(`conversations:messages:${currentId}`)
+        invalidateCache(`conversations:messages:${currentConversationId.value}`)
         invalidateCache('conversations:list')
         loadConversations()
       },
       onError: (error) => {
-        // Mark global stream as errored
-        globalStreaming.errorStream(currentId, error)
-
         // 移除临时消息
         const idx = messages.value.findIndex(m => m.id === assistantMessageId)
         if (idx > -1) {
           messages.value.splice(idx, 1)
         }
-        // Also update localStorage to remove failed assistant message
-        conversationStorage.saveConversationMessages(currentConversationId.value, messages.value)
-
         ElMessage.error(error || '生成失败')
         streaming.reset()
       }
@@ -1072,9 +720,6 @@ async function handleSend({ content, model }) {
     if (idx > -1) {
       messages.value.splice(idx, 1)
     }
-    // Update localStorage
-    conversationStorage.saveConversationMessages(currentConversationId.value, messages.value)
-
     if (error.name !== 'AbortError') {
       ElMessage.error('发送失败')
     }

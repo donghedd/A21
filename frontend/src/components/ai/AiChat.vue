@@ -335,6 +335,7 @@ const messagesContainer = ref(null)
 const showScrollBtn = ref(false)
 const modelSelectorVisible = ref(false)
 const isDefaultModel = ref(false)
+const bubbleListKey = ref(0)
 const inlineEditInput = ref(null)
 const editingDraft = ref('')
 const titleInput = ref(null)
@@ -669,14 +670,26 @@ watch(selectedModel, (val) => {
   isDefaultModel.value = savedDefault === val
 })
 
-// Watch for external defaultModel changes
-watch(() => props.defaultModel, (val) => {
-  if (val && val !== selectedModel.value) {
-    selectedModel.value = val
+watch(() => props.editingMessageId, async (val) => {
+  if (!val) {
+    editingDraft.value = ''
+    return
+  }
+
+  const target = props.messages.find(msg => msg.id === val)
+  editingDraft.value = target?.content || ''
+  await nextTick()
+  const textarea = inlineEditInput.value?.textarea
+  textarea?.focus()
+  textarea?.setSelectionRange(textarea.value.length, textarea.value.length)
+})
+
+watch(() => props.title, () => {
+  if (!isEditingTitle.value) {
+    titleDraft.value = props.title || ''
   }
 })
 
-// Initialize isDefaultModel on mount
 onMounted(() => {
   const savedDefault = localStorage.getItem('sfqa_default_model')
   isDefaultModel.value = savedDefault === selectedModel.value
