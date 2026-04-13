@@ -135,7 +135,7 @@
           :is="Component"
           class="panel-route-view"
           :title="currentConversationTitle"
-          :messages="messages"
+          :messages="displayMessages"
           :is-streaming="isCurrentConversationStreaming"
           :models="availableModels"
           :default-model="selectedModel"
@@ -144,6 +144,7 @@
           :sidebar-collapsed="sidebarCollapsed"
           :prompts="defaultPrompts"
           :editing-message-id="editingMessageId"
+          :title-editable="Boolean(currentConversationId)"
           @send="handleSend"
           @stop="handleStop"
           @regenerate="handleRegenerate"
@@ -294,7 +295,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Plus,
@@ -319,9 +320,8 @@ import {
   Reading
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore, useConversationStore } from '@/stores'
 import { useStreaming } from '@/composables/useStreaming'
-import { useConversationStorage } from '@/composables/useConversationStorage'
 import { useGlobalStreaming } from '@/composables/useGlobalStreaming'
 import * as chatApi from '@/api/chat'
 import * as modelApi from '@/api/model'
@@ -331,13 +331,34 @@ import { getOrFetch, invalidateCache, CACHE_TTL } from '@/utils/cache'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const conversationStore = useConversationStore()
 const streaming = useStreaming()
+const globalStreaming = useGlobalStreaming()
+
+// Check if current conversation has an active stream (for input disabling)
+const isCurrentConversationStreaming = computed(() => {
+  const currentId = currentConversationId.value
+  if (!currentId) return false
+
+  // Check if this specific conversation has an active stream
+  const hasStream = globalStreaming.hasActiveStream(currentId)
+  if (hasStream) return true
+
+  // Also check if any message in current conversation is streaming
+  return messages.value.some(m => m.isStreaming)
+})
 
 // 状态
 const user = computed(() => authStore.user)
-const conversations = ref([])
-const currentConversationId = ref(null)
-const messages = ref([])
+const conversations = computed({
+  get: () => conversationStore.conversations,
+  set: (val) => conversationStore.setConversations(val)
+})
+const currentConversationId = computed({
+  get: () => conversationStore.currentConversationId,
+  set: (val) => conversationStore.setCurrentConversation(val)
+})
+const messages = computed(() => conversationStore.currentMessages)
 const selectedModel = ref(null)
 const availableModels = ref([])
 const sidebarCollapsed = ref(false)
@@ -364,6 +385,16 @@ const currentConversationTitle = computed(() => {
   if (!currentConversationId.value) return '新对话'
   const conv = conversations.value.find(c => c.id === currentConversationId.value)
   return conv?.title || ''
+})
+const displayMessages = computed(() => {
+  if (!editingSnapshot.value) return messages.value
+
+  const targetIndex = editingSnapshot.value.targetIndex
+  if (typeof targetIndex !== 'number' || targetIndex < 0) {
+    return messages.value
+  }
+
+  return messages.value.slice(0, targetIndex + 1)
 })
 const isChatHomeRoute = computed(() => route.name === 'ChatHome')
 
@@ -429,23 +460,25 @@ function handleGlobalPointerDown(event) {
 }
 
 function restoreEditedMessages() {
-  if (!editingSnapshot.value?.restoreOnCancel) {
-    clearEditState()
-    return
-  }
-
-  const { targetIndex, followingMessages } = editingSnapshot.value
-  const preserved = messages.value.slice(0, targetIndex + 1)
-  messages.value = [...preserved, ...followingMessages]
   clearEditState()
 }
 
 function removeStreamingArtifacts() {
-  messages.value = messages.value.filter(msg => !msg.isStreaming)
+  if (!currentConversationId.value) return
+
+  for (const msg of messages.value.filter(message => message.isStreaming)) {
+    conversationStore.removeMessage(currentConversationId.value, msg.id)
+  }
 }
 
 async function resolveEditableMessageId(snapshot) {
-  if (!snapshot?.targetId || !String(snapshot.targetId).startsWith('temp-user-')) {
+  if (!snapshot?.targetId) {
+    return null
+  }
+
+  const targetId = String(snapshot.targetId)
+  const needsResolve = targetId.startsWith('temp-user-') || targetId.startsWith('user-')
+  if (!needsResolve) {
     return snapshot?.targetId
   }
 
@@ -461,9 +494,11 @@ async function resolveEditableMessageId(snapshot) {
   if (!matchedUserMessage) return null
 
   snapshot.targetId = matchedUserMessage.id
-  currentMessage.id = matchedUserMessage.id
   return matchedUserMessage.id
 }
+
+let selectConversationTimeout = null
+let isLoadingConversation = false
 
 // 方法
 async function loadModels() {
@@ -517,17 +552,19 @@ async function loadConversations() {
       () => chatApi.getConversations({ per_page: 50 }),
       CACHE_TTL.CONVERSATIONS
     )
-    conversations.value = cached?.data?.conversations || cached?.conversations || []
+    const serverConversations = cached?.data?.conversations || cached?.conversations || []
+
+    conversationStore.setConversations(serverConversations)
   } catch (error) {
     console.error('Failed to load conversations:', error)
+    ElMessage.error('加载对话列表失败')
   }
 }
 
 async function createNewChat() {
   closeConversationMenu()
   clearEditState()
-  currentConversationId.value = null
-  messages.value = []
+  conversationStore.setCurrentConversation(null)
   await router.push({ name: 'ChatHome' })
 }
 
@@ -539,12 +576,13 @@ async function deleteConversation(id) {
       type: 'warning'
     })
     await chatApi.deleteConversation(id)
-    conversations.value = conversations.value.filter(c => c.id !== id)
+    const updatedConversations = conversations.value.filter(c => c.id !== id)
+    conversationStore.setConversations(updatedConversations)
+    conversationStore.clearConversation(id)
     invalidateCache('conversations:list')
     invalidateCache(`conversations:messages:${id}`)
     if (currentConversationId.value === id) {
-      currentConversationId.value = null
-      messages.value = []
+      conversationStore.setCurrentConversation(null)
       clearEditState()
     }
     ElMessage.success('对话已删除')
@@ -559,54 +597,140 @@ async function selectConversation(id) {
   if (currentConversationId.value === id) return
   if (isLoadingConversation) return
 
-  currentConversationId.value = id
-
-  try {
-    const cached = await getOrFetch(`conversations:messages:${id}`,
-      () => chatApi.getConversation(id),
-      CACHE_TTL.MESSAGES
-    )
-    messages.value = (cached?.data?.messages || cached?.messages || []).map(msg => ({
-      id: msg.id,
-      role: msg.role,
-      content: msg.content,
-      thinking: msg.thinking_content,
-      thinkingDuration: msg.thinking_duration,
-      sources: msg.sources,
-      created_at: msg.created_at
-    }))
-  } catch (error) {
-    messages.value = []
-    ElMessage.error('加载对话失败')
+  if (selectConversationTimeout) {
+    clearTimeout(selectConversationTimeout)
   }
+
+  selectConversationTimeout = setTimeout(async () => {
+    isLoadingConversation = true
+
+    conversationStore.setCurrentConversation(id)
+    const activeStream = globalStreaming.setVisibleConversation(id)
+    conversationStore.initConversationStorage(id)
+
+    try {
+      if (activeStream && activeStream.isStreaming) {
+        conversationStore.startStreaming(
+          id,
+          activeStream.userMessageId,
+          activeStream.messageId
+        )
+
+        const streamingAssistantId = activeStream.messageId || 'streaming-assistant'
+        globalStreaming.registerCallbacks(id, {
+          onContent: (content) => {
+            conversationStore.updateStreamingContent(id, content)
+            conversationStore.updateAssistantMessage(id, streamingAssistantId, {
+              content,
+              loading: false
+            })
+          },
+          onThinking: (thinking) => {
+            conversationStore.updateStreamingThinking(id, thinking)
+            conversationStore.updateAssistantMessage(id, streamingAssistantId, { thinking })
+          },
+          onThinkingStart: () => {
+            conversationStore.markThinkingStarted(id)
+          },
+          onThinkingEnd: (duration) => {
+            conversationStore.markThinkingEnded(id, duration)
+          },
+          onSources: (sources) => {
+            conversationStore.updateStreamingSources(id, sources)
+            conversationStore.updateAssistantMessage(id, streamingAssistantId, { sources })
+          },
+          onDone: (result) => {
+            conversationStore.completeStreaming(id, result)
+            conversationStore.updateAssistantMessage(id, streamingAssistantId, {
+              id: result.messageId || streamingAssistantId,
+              content: result.content,
+              thinking: result.thinking,
+              thinkingDuration: result.thinkingDuration,
+              sources: result.sources || [],
+              isStreaming: false,
+              loading: false
+            })
+            loadConversations()
+          },
+          onError: (error) => {
+            ElMessage.error(error || '生成失败')
+          }
+        })
+
+        isLoadingConversation = false
+        return
+      }
+
+      const cached = await getOrFetch(`conversations:messages:${id}`,
+        () => chatApi.getConversation(id),
+        CACHE_TTL.MESSAGES
+      )
+
+      const serverMessages = (cached?.data?.messages || cached?.messages || []).map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        thinking: msg.thinking_content,
+        thinkingDuration: msg.thinking_duration,
+        sources: msg.sources,
+        created_at: msg.created_at
+      }))
+
+      conversationStore.syncMessagesFromServer(id, serverMessages)
+
+      const conversationData = cached?.data || cached
+      if (conversationData?.custom_model_id) {
+        const customModel = availableModels.value.find(m => m.id === conversationData.custom_model_id)
+        if (customModel) {
+          selectedModel.value = conversationData.custom_model_id
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error)
+      ElMessage.error('加载对话失败')
+    } finally {
+      isLoadingConversation = false
+    }
+  }, 50)
 }
 
 async function handleSend({ content, model }) {
-  if (!currentConversationId.value) {
+  let conversationId = currentConversationId.value
+
+  if (!conversationId) {
     try {
-      const res = await chatApi.createConversation({ title: content.slice(0, 50) })
+      const modelInfo = availableModels.value.find(m => m.id === model)
+      const createData = { title: content.slice(0, 50) }
+      if (modelInfo?.type === 'custom') {
+        createData.custom_model_id = model
+      }
+
+      const res = await chatApi.createConversation(createData)
       const conv = res.data
-      conversations.value.unshift(conv)
-      currentConversationId.value = conv.id
+
+      const updatedConversations = [conv, ...conversations.value]
+      conversationStore.setConversations(updatedConversations)
+      conversationStore.setCurrentConversation(conv.id)
+
+      conversationId = conv.id
     } catch (error) {
       ElMessage.error('创建对话失败')
       return
     }
   }
 
-  // 添加用户消息
-  const userMessageId = 'temp-' + Date.now()
+  const currentId = conversationId
   const userMessage = {
-    id: userMessageId,
     role: 'user',
     content,
     created_at: new Date().toISOString()
-  })
+  }
+  const pairId = conversationStore.addUserMessage(currentId, userMessage)
+  const userMessageId = conversationStore.conversationMessages.get(currentId)?.messagePairs.find(
+    p => p.id === pairId
+  )?.userMessage?.id
 
-  // 添加临时的助手消息用于流式显示
-  const assistantMessageId = 'temp-assistant-' + Date.now()
-  messages.value.push({
-    id: assistantMessageId,
+  const assistantMessage = {
     role: 'assistant',
     content: '',
     thinking: '',
@@ -616,16 +740,36 @@ async function handleSend({ content, model }) {
     isStreaming: true,
     loading: true,
     interrupted: false
+  }
+  conversationStore.addAssistantMessage(currentId, userMessageId, assistantMessage)
+  const assistantMessageId = conversationStore.conversationMessages.get(currentId)?.messagePairs.find(
+    p => p.userMessage?.id === userMessageId
+  )?.assistantMessage?.id
+
+  // Start global stream tracking
+  globalStreaming.startStream(currentId, {
+    userMessageId,
+    messageId: assistantMessageId
   })
+
+  conversationStore.startStreaming(currentId, userMessageId, assistantMessageId)
 
   try {
     const signal = streaming.createAbortSignal()
     const modelInfo = availableModels.value.find(m => m.id === model)
-    const modelParam = modelInfo?.type === 'ollama' ? model : null
-    const customModelIdParam = modelInfo?.type === 'custom' ? model : null
+
+    let modelParam = null
+    let customModelIdParam = null
+
+    if (modelInfo?.type === 'custom') {
+      customModelIdParam = model
+      modelParam = modelInfo.base_model || null
+    } else {
+      modelParam = model
+    }
 
     const response = await chatApi.sendMessageStream(
-      currentConversationId.value,
+      currentId,
       content,
       modelParam,
       customModelIdParam,
@@ -634,42 +778,42 @@ async function handleSend({ content, model }) {
 
     await streaming.processStream(response, {
       onContent: (chunk, fullContent) => {
-        // 实时更新助手消息内容
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.content = fullContent
-          // 有内容后关闭加载状态
-          if (fullContent && assistantMsg.loading) {
-            assistantMsg.loading = false
-          }
-        }
+        globalStreaming.updateStreamContent(currentId, fullContent)
+
+        conversationStore.updateStreamingContent(currentId, fullContent)
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          content: fullContent,
+          loading: false
+        })
       },
       onThinking: (chunk, fullThinking) => {
-        // 实时更新思考内容
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.thinking = fullThinking
-          // 有思考内容后关闭加载状态
-          if (fullThinking && assistantMsg.loading) {
-            assistantMsg.loading = false
-          }
-        }
+        globalStreaming.updateStreamThinking(currentId, fullThinking)
+
+        conversationStore.updateStreamingThinking(currentId, fullThinking)
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          thinking: fullThinking,
+          loading: false
+        })
       },
-      onThinkingStart: () => {},
+      onThinkingStart: () => {
+        globalStreaming.markThinkingStarted(currentId)
+        conversationStore.markThinkingStarted(currentId)
+      },
       onThinkingEnd: (duration) => {
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.thinkingDuration = duration
-        }
+        globalStreaming.markThinkingEnded(currentId, duration)
+        conversationStore.markThinkingEnded(currentId, duration)
+
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          thinkingDuration: duration
+        })
       },
       onSources: (sources) => {
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.sources = sources
-        }
+        globalStreaming.updateStreamSources(currentId, sources)
+        conversationStore.updateStreamingSources(currentId, sources)
+
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, { sources })
       },
       onDone: (result) => {
-        // Complete global stream
         globalStreaming.completeStream(currentId, {
           messageId: result.messageId,
           userMessageId: result.userMessageId,
@@ -680,46 +824,36 @@ async function handleSend({ content, model }) {
           aborted: result.aborted
         })
 
-        const isVisible = currentConversationId.value === currentId
-
-        // Update local message if visible
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.id = result.messageId || assistantMessageId
-          assistantMsg.content = result.content
-          assistantMsg.thinking = result.thinking
-          assistantMsg.thinkingDuration = result.thinkingDuration
-          assistantMsg.sources = result.sources || []
-          assistantMsg.isStreaming = false
-          assistantMsg.loading = false
-          assistantMsg.interrupted = result.aborted
-        }
+        conversationStore.completeStreaming(currentId, result)
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          id: result.messageId || assistantMessageId,
+          content: result.content,
+          thinking: result.thinking,
+          thinkingDuration: result.thinkingDuration,
+          sources: result.sources || [],
+          isStreaming: false,
+          loading: false,
+          interrupted: result.aborted
+        })
 
         if (result.aborted) {
           ElMessage.info('已终止生成')
         }
 
         streaming.reset()
-        invalidateCache(`conversations:messages:${currentConversationId.value}`)
+        invalidateCache(`conversations:messages:${currentId}`)
         invalidateCache('conversations:list')
         loadConversations()
       },
       onError: (error) => {
-        // 移除临时消息
-        const idx = messages.value.findIndex(m => m.id === assistantMessageId)
-        if (idx > -1) {
-          messages.value.splice(idx, 1)
-        }
+        globalStreaming.errorStream(currentId, error)
+        conversationStore.removeMessage(currentId, assistantMessageId)
         ElMessage.error(error || '生成失败')
         streaming.reset()
       }
     })
   } catch (error) {
-    // 移除临时消息
-    const idx = messages.value.findIndex(m => m.id === assistantMessageId)
-    if (idx > -1) {
-      messages.value.splice(idx, 1)
-    }
+    conversationStore.removeMessage(currentId, assistantMessageId)
     if (error.name !== 'AbortError') {
       ElMessage.error('发送失败')
     }
@@ -738,29 +872,30 @@ function handleStop() {
     globalStreaming.abortStream(currentId)
   }
 
-  // 立即更新当前正在流式传输的消息状态
-  const streamingMsg = messages.value.find(m => m.isStreaming)
-  if (streamingMsg) {
-    streamingMsg.loading = false
-    streamingMsg.interrupted = true
-    streamingMsg.isStreaming = false
-  }
+  // 通过 store 中止流式响应
+  conversationStore.abortStreaming(currentId)
 }
 
 async function handleRegenerate(item) {
   const currentId = currentConversationId.value
   if (!currentId || globalStreaming.hasActiveStream(currentId)) return
 
-  // 移除最后一条助手消息
-  const lastIdx = messages.value.length - 1
-  if (lastIdx >= 0 && messages.value[lastIdx].role === 'assistant') {
-    messages.value.splice(lastIdx, 1)
+  // 获取最后一条用户消息的ID
+  const convData = conversationStore.conversationMessages.get(currentId)
+  if (!convData || convData.messagePairs.length === 0) return
+
+  const lastPair = convData.messagePairs[convData.messagePairs.length - 1]
+  if (!lastPair.userMessage) return
+
+  const userMessageId = lastPair.userMessage.id
+
+  // 移除最后一条助手消息（如果存在）
+  if (lastPair.assistantMessage) {
+    conversationStore.removeMessage(currentId, lastPair.assistantMessage.id)
   }
 
-  // 添加临时的助手消息用于流式显示
-  const assistantMessageId = 'temp-assistant-' + Date.now()
-  messages.value.push({
-    id: assistantMessageId,
+  // 添加新的临时助手消息
+  const assistantMessage = {
     role: 'assistant',
     content: '',
     thinking: '',
@@ -770,16 +905,35 @@ async function handleRegenerate(item) {
     isStreaming: true,
     loading: true,
     interrupted: false
-  })
+  }
+  conversationStore.addAssistantMessage(currentId, userMessageId, assistantMessage)
+
+  const assistantMessageId = conversationStore.conversationMessages.get(currentId)?.messagePairs.find(
+    p => p.userMessage?.id === userMessageId
+  )?.assistantMessage?.id
 
   try {
     const signal = streaming.createAbortSignal()
     const modelInfo = availableModels.value.find(m => m.id === selectedModel.value)
-    const modelParam = modelInfo?.type === 'ollama' ? selectedModel.value : null
-    const customModelIdParam = modelInfo?.type === 'custom' ? selectedModel.value : null
+
+    // 修复模型参数传递：正确区分 ollama 模型和自定义模型
+    let modelParam = null
+    let customModelIdParam = null
+
+    if (modelInfo?.type === 'custom') {
+      // 自定义模型：使用 base_model 作为 model 参数，custom_model_id 作为自定义模型ID
+      customModelIdParam = selectedModel.value
+      modelParam = modelInfo.base_model || null
+    } else if (modelInfo?.type === 'ollama') {
+      // Ollama 基础模型
+      modelParam = selectedModel.value
+    } else {
+      // 默认情况
+      modelParam = selectedModel.value
+    }
 
     const response = await chatApi.regenerateResponse(
-      currentConversationId.value,
+      currentId,
       modelParam,
       customModelIdParam,
       signal
@@ -787,50 +941,37 @@ async function handleRegenerate(item) {
 
     await streaming.processStream(response, {
       onContent: (chunk, fullContent) => {
-        // 实时更新助手消息内容
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.content = fullContent
-          if (fullContent && assistantMsg.loading) {
-            assistantMsg.loading = false
-          }
-        }
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          content: fullContent,
+          loading: false
+        })
       },
       onThinking: (chunk, fullThinking) => {
-        // 实时更新思考内容
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.thinking = fullThinking
-          if (fullThinking && assistantMsg.loading) {
-            assistantMsg.loading = false
-          }
-        }
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          thinking: fullThinking,
+          loading: false
+        })
       },
       onThinkingStart: () => {},
       onThinkingEnd: (duration) => {
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.thinkingDuration = duration
-        }
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          thinkingDuration: duration
+        })
       },
       onSources: (sources) => {
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.sources = sources
-        }
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, { sources })
       },
       onDone: (result) => {
-        const assistantMsg = messages.value.find(m => m.id === assistantMessageId)
-        if (assistantMsg) {
-          assistantMsg.id = result.messageId || assistantMessageId
-          assistantMsg.content = result.content
-          assistantMsg.thinking = result.thinking
-          assistantMsg.thinkingDuration = result.thinkingDuration
-          assistantMsg.sources = result.sources || []
-          assistantMsg.isStreaming = false
-          assistantMsg.loading = false
-          assistantMsg.interrupted = result.aborted
-        }
+        conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+          id: result.messageId || assistantMessageId,
+          content: result.content,
+          thinking: result.thinking,
+          thinkingDuration: result.thinkingDuration,
+          sources: result.sources || [],
+          isStreaming: false,
+          loading: false,
+          interrupted: result.aborted
+        })
 
         if (result.aborted) {
           ElMessage.info('已终止生成')
@@ -839,20 +980,14 @@ async function handleRegenerate(item) {
         streaming.reset()
       },
       onError: (error) => {
-        const idx = messages.value.findIndex(m => m.id === assistantMessageId)
-        if (idx > -1) {
-          messages.value.splice(idx, 1)
-        }
+        conversationStore.removeMessage(currentId, assistantMessageId)
         ElMessage.error(error || '重新生成失败')
         streaming.reset()
       }
     })
   } catch (error) {
     // 移除临时消息
-    const idx = messages.value.findIndex(m => m.id === assistantMessageId)
-    if (idx > -1) {
-      messages.value.splice(idx, 1)
-    }
+    conversationStore.removeMessage(currentId, assistantMessageId)
     if (error.name !== 'AbortError') {
       ElMessage.error('重新生成失败')
     }
@@ -872,21 +1007,17 @@ function handleEdit(item) {
   const targetIndex = messages.value.findIndex(msg => msg.id === item.id)
   if (targetIndex < 0) return
 
-  const followingMessages = messages.value.slice(targetIndex + 1)
   const wasStreaming = streaming.isStreaming.value
 
   if (wasStreaming) {
-    handleStop({ keepPartial: false })
+    handleStop()
   }
 
   editingSnapshot.value = {
     targetId: item.id,
-    targetIndex,
-    followingMessages: wasStreaming ? [] : followingMessages,
-    restoreOnCancel: !wasStreaming
+    targetIndex
   }
   editingMessageId.value = item.id
-  messages.value = messages.value.slice(0, targetIndex + 1)
 }
 
 async function handleEditSubmit({ item, content }) {
@@ -902,8 +1033,13 @@ async function handleEditSubmit({ item, content }) {
       throw new Error('missing_target_id')
     }
 
+    const preservedMessages = messages.value
+      .slice(0, snapshot.targetIndex)
+      .map(message => ({ ...message }))
     await chatApi.deleteMessagesFrom(currentConversationId.value, targetId)
-    messages.value = messages.value.slice(0, snapshot.targetIndex)
+    conversationStore.clearConversation(currentConversationId.value)
+    conversationStore.initConversationStorage(currentConversationId.value)
+    conversationStore.syncMessagesFromServer(currentConversationId.value, preservedMessages)
     clearEditState()
     invalidateCache(`conversations:messages:${currentConversationId.value}`)
     invalidateCache('conversations:list')
@@ -969,6 +1105,7 @@ async function handleTitleSubmit(title) {
     if (currentConversation) {
       currentConversation.title = nextTitle
     }
+
     invalidateCache('conversations:list')
   } catch (error) {
     ElMessage.error('标题更新失败')
@@ -1056,6 +1193,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', handleGlobalPointerDown)
+  if (selectConversationTimeout) clearTimeout(selectConversationTimeout)
+  if (searchTimeout) clearTimeout(searchTimeout)
 })
 </script>
 

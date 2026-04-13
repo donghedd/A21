@@ -750,12 +750,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 20px 20px;
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(99, 102, 241, 0.08);
-  height: 56px;
+  height: 72px;
   flex-shrink: 0;
   
   .header-left {
@@ -788,15 +788,17 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 10px 20px;
+      padding: 14px 24px;
       border-radius: 14px;
       background: rgba(99, 102, 241, 0.06);
       border: 1px solid rgba(99, 102, 241, 0.12);
       color: #1E1B4B;
       font-weight: 600;
       font-size: 15px;
+      line-height: 1.5;
       transition: all 0.25s ease;
       min-width: 160px;
+      min-height: 48px;
       justify-content: space-between;
 
       &:hover {
@@ -1006,7 +1008,7 @@ onUnmounted(() => {
 .ai-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 32px;
+  padding: 10px 32px 28px 32px;
   position: relative;
   scroll-behavior: smooth;
   
