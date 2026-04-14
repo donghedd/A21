@@ -8,39 +8,44 @@
         </div>
 
         <div class="sidebar-section">
-          <div
-            class="sidebar-item"
-            :class="{ active: activeTab === 'users' }"
-            @click="activeTab = 'users'"
-          >
-            <el-icon><User /></el-icon>
-            <span>用户管理</span>
+          <div class="list-header">
+            <span class="list-title">管理目录</span>
           </div>
-        <div
-          class="sidebar-item"
-          :class="{ active: activeTab === 'knowledge' }"
-          @click="activeTab = 'knowledge'"
-        >
-          <el-icon><FolderOpened /></el-icon>
-          <span>知识库管理</span>
+          <div class="admin-nav-items">
+            <div
+              class="sidebar-item"
+              :class="{ active: activeTab === 'users' }"
+              @click="activeTab = 'users'"
+            >
+              <el-icon><User /></el-icon>
+              <span>用户管理</span>
+            </div>
+            <div
+              class="sidebar-item"
+              :class="{ active: activeTab === 'knowledge' }"
+              @click="activeTab = 'knowledge'"
+            >
+              <el-icon><FolderOpened /></el-icon>
+              <span>知识库管理</span>
+            </div>
+            <div
+              class="sidebar-item"
+              :class="{ active: activeTab === 'workspace' }"
+              @click="activeTab = 'workspace'"
+            >
+              <el-icon><Setting /></el-icon>
+              <span>工作空间</span>
+            </div>
+            <div
+              class="sidebar-item"
+              :class="{ active: activeTab === 'history' }"
+              @click="activeTab = 'history'"
+            >
+              <el-icon><Document /></el-icon>
+              <span>对话历史管理</span>
+            </div>
+          </div>
         </div>
-        <div
-          class="sidebar-item"
-          :class="{ active: activeTab === 'workspace' }"
-          @click="activeTab = 'workspace'"
-        >
-          <el-icon><Setting /></el-icon>
-          <span>工作空间</span>
-        </div>
-        <div
-          class="sidebar-item"
-          :class="{ active: activeTab === 'history' }"
-          @click="activeTab = 'history'"
-        >
-          <el-icon><Document /></el-icon>
-          <span>对话历史管理</span>
-        </div>
-      </div>
       </div>
 
       <div class="sidebar-footer">
@@ -234,7 +239,6 @@
             </el-table-column>
           </el-table>
         </div>
-
       </section>
 
       <section v-else-if="activeTab === 'history'" class="history-layout">
@@ -566,11 +570,15 @@ onMounted(() => {
 }
 
 .sidebar-top {
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-header {
   margin-bottom: 26px;
+  padding: 0 8px;
 }
 
 .brand-title {
@@ -586,9 +594,31 @@ onMounted(() => {
 }
 
 .sidebar-section {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.list-header {
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+
+.list-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #A5A3C9;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.admin-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .sidebar-footer {
@@ -601,22 +631,48 @@ onMounted(() => {
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
   cursor: pointer;
   color: #5B5580;
   transition: all 0.2s ease;
+  position: relative;
+
+  .el-icon {
+    color: #A5A3C9;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+  }
+
+  span {
+    flex: 1;
+    font-size: 13.5px;
+    color: #4B5563;
+    transition: color 0.2s ease, font-weight 0.2s ease;
+  }
 
   &:hover {
-    background: rgba(99, 102, 241, 0.08);
-    color: #4F46E5;
+    background: rgba(99, 102, 241, 0.07);
+
+    .el-icon,
+    span {
+      color: #6366F1;
+    }
   }
 
   &.active {
-    background: rgba(99, 102, 241, 0.14);
-    color: #4F46E5;
-    font-weight: 700;
+    background: rgba(99, 102, 241, 0.12);
+
+    .el-icon {
+      color: #6366F1;
+    }
+
+    span {
+      color: #4F46E5;
+      font-weight: 600;
+    }
   }
 }
 
@@ -720,6 +776,23 @@ onMounted(() => {
   margin-top: 16px;
 }
 
+.sidebar-section::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-section::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 10px;
+}
+
+.sidebar-section::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.28);
+}
+
 .switch-side-btn {
   flex-shrink: 0;
   color: #6366F1;
@@ -817,5 +890,4 @@ onMounted(() => {
     box-shadow: 0 0 0 1px #6366F1 inset, 0 0 0 4px rgba(99, 102, 241, 0.1);
   }
 }
-
 </style>
