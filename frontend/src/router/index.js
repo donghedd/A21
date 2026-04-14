@@ -30,6 +30,11 @@ const routes = [
         component: () => import('@/views/workspace/WorkspaceView.vue')
       },
       {
+        path: 'history',
+        name: 'HistoryManage',
+        component: () => import('@/views/history/HistoryManageView.vue')
+      },
+      {
         path: 'workspace/model/:id',
         name: 'ModelDetail',
         component: () => import('@/views/workspace/ModelDetailView.vue')

@@ -32,9 +32,11 @@ CREATE TABLE IF NOT EXISTS custom_models (
     base_model VARCHAR(100) NOT NULL,
     system_prompt TEXT,
     description VARCHAR(500),
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id),
+    INDEX idx_custom_models_is_system (is_system),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -48,9 +50,11 @@ CREATE TABLE IF NOT EXISTS external_models (
     model_name VARCHAR(100),
     system_prompt TEXT,
     description VARCHAR(500),
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_external_models_user_id (user_id),
+    INDEX idx_external_models_is_system (is_system),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -61,10 +65,12 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
     name VARCHAR(100) NOT NULL,
     description VARCHAR(500),
     collection_name VARCHAR(100) NOT NULL UNIQUE,
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id),
     INDEX idx_collection_name (collection_name),
+    INDEX idx_kb_is_system (is_system),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -121,6 +127,19 @@ CREATE TABLE IF NOT EXISTS conversations (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (custom_model_id) REFERENCES custom_models(id) ON DELETE SET NULL,
     FOREIGN KEY (external_model_id) REFERENCES external_models(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- External Model-Knowledge bindings table
+CREATE TABLE IF NOT EXISTS external_model_knowledge_bindings (
+    id VARCHAR(36) PRIMARY KEY,
+    external_model_id VARCHAR(36) NOT NULL,
+    knowledge_base_id VARCHAR(36) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_external_model_id (external_model_id),
+    INDEX idx_external_knowledge_base_id (knowledge_base_id),
+    UNIQUE KEY unique_external_model_knowledge (external_model_id, knowledge_base_id),
+    FOREIGN KEY (external_model_id) REFERENCES external_models(id) ON DELETE CASCADE,
+    FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Messages table

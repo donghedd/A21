@@ -82,6 +82,79 @@ def ensure_schema_updates(app):
             if 'conversations' not in inspector.get_table_names():
                 return
 
+            if 'knowledge_bases' in inspector.get_table_names():
+                kb_columns = {column['name'] for column in inspector.get_columns('knowledge_bases')}
+                if 'is_system' not in kb_columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text(
+                            'ALTER TABLE knowledge_bases '
+                            'ADD COLUMN is_system BOOLEAN NOT NULL DEFAULT FALSE'
+                        ))
+                        conn.execute(text(
+                            'ALTER TABLE knowledge_bases '
+                            'ADD INDEX idx_kb_is_system (is_system)'
+                        ))
+                        if 'visibility' in kb_columns:
+                            conn.execute(text(
+                                "UPDATE knowledge_bases SET is_system = TRUE "
+                                "WHERE visibility IN ('public', 'system')"
+                            ))
+                        elif 'is_public' in kb_columns:
+                            conn.execute(text(
+                                "UPDATE knowledge_bases SET is_system = TRUE WHERE is_public = TRUE"
+                            ))
+
+            if 'custom_models' in inspector.get_table_names():
+                custom_model_columns = {column['name'] for column in inspector.get_columns('custom_models')}
+                if 'is_system' not in custom_model_columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text(
+                            'ALTER TABLE custom_models '
+                            'ADD COLUMN is_system BOOLEAN NOT NULL DEFAULT FALSE'
+                        ))
+                        conn.execute(text(
+                            'ALTER TABLE custom_models '
+                            'ADD INDEX idx_custom_models_is_system (is_system)'
+                        ))
+                        if 'visibility' in custom_model_columns:
+                            conn.execute(text(
+                                "UPDATE custom_models SET is_system = TRUE "
+                                "WHERE visibility IN ('public', 'system')"
+                            ))
+                        elif 'is_public' in custom_model_columns:
+                            conn.execute(text(
+                                "UPDATE custom_models SET is_system = TRUE WHERE is_public = TRUE"
+                            ))
+
+            if 'external_models' in inspector.get_table_names():
+                external_model_columns = {column['name'] for column in inspector.get_columns('external_models')}
+                if 'is_system' not in external_model_columns:
+                    with db.engine.begin() as conn:
+                        conn.execute(text(
+                            'ALTER TABLE external_models '
+                            'ADD COLUMN is_system BOOLEAN NOT NULL DEFAULT FALSE'
+                        ))
+                        conn.execute(text(
+                            'ALTER TABLE external_models '
+                            'ADD INDEX idx_external_models_is_system (is_system)'
+                        ))
+
+            if 'external_model_knowledge_bindings' not in inspector.get_table_names():
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        'CREATE TABLE external_model_knowledge_bindings ('
+                        'id VARCHAR(36) PRIMARY KEY, '
+                        'external_model_id VARCHAR(36) NOT NULL, '
+                        'knowledge_base_id VARCHAR(36) NOT NULL, '
+                        'created_at DATETIME DEFAULT CURRENT_TIMESTAMP, '
+                        'INDEX idx_external_model_id (external_model_id), '
+                        'INDEX idx_external_knowledge_base_id (knowledge_base_id), '
+                        'CONSTRAINT unique_external_model_knowledge UNIQUE (external_model_id, knowledge_base_id), '
+                        'CONSTRAINT fk_external_model_knowledge_model FOREIGN KEY (external_model_id) REFERENCES external_models(id) ON DELETE CASCADE, '
+                        'CONSTRAINT fk_external_model_knowledge_kb FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE'
+                        ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+                    ))
+
             conversation_columns = {column['name'] for column in inspector.get_columns('conversations')}
             if 'deleted_by_user' not in conversation_columns:
                 with db.engine.begin() as conn:

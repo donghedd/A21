@@ -95,6 +95,7 @@ class BaseLoader(ABC):
         from .excel_loader import ExcelLoader
         from .markdown_loader import MarkdownLoader
         from .text_loader import TextLoader
+        from .json_loader import JsonLoader
         
         if file_type is None:
             file_type = file_path.split('.')[-1].lower()
@@ -132,7 +133,7 @@ class BaseLoader(ABC):
             'html': TextLoader,
             'htm': TextLoader,
             'css': TextLoader,
-            'json': TextLoader,
+            'json': JsonLoader,
             'xml': TextLoader,
             'yaml': TextLoader,
             'yml': TextLoader,

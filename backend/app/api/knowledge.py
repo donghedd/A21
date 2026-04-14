@@ -5,7 +5,7 @@ from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from . import knowledge_bp
 from ..utils.response import success_response, error_response
-from ..models import KnowledgeBase, File
+from ..models import KnowledgeBase, File, User
 from ..extensions import db
 from ..services import get_vector_service
 
@@ -13,10 +13,11 @@ from ..services import get_vector_service
 @knowledge_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_knowledge_bases():
-    """Get user's knowledge bases"""
+    """Get visible knowledge bases: own plus shared/system."""
     user_id = get_jwt_identity()
-    
-    kbs = KnowledgeBase.query.filter_by(user_id=user_id).order_by(
+
+    kbs = KnowledgeBase.get_visible_query(user_id).order_by(
+        KnowledgeBase.is_system.desc(),
         KnowledgeBase.created_at.desc()
     ).all()
     
@@ -34,6 +35,14 @@ def create_knowledge_base():
     
     if not data or not data.get('name'):
         return error_response(400, 'Name is required')
+
+    user = User.query.get(user_id)
+    if not user:
+        return error_response(401, 'User not found')
+
+    requested_shared = bool(data.get('is_system', False))
+    if requested_shared and user.role != 'admin':
+        return error_response(403, 'Only admin can create shared knowledge bases')
     
     # Generate unique collection name
     collection_name = f"kb_{uuid.uuid4().hex[:12]}"
@@ -43,7 +52,8 @@ def create_knowledge_base():
         user_id=user_id,
         name=data['name'],
         description=data.get('description', ''),
-        collection_name=collection_name
+        collection_name=collection_name,
+        is_system=requested_shared
     )
     
     try:
@@ -61,7 +71,7 @@ def get_knowledge_base(kb_id):
     """Get knowledge base details"""
     user_id = get_jwt_identity()
     
-    kb = KnowledgeBase.query.filter_by(id=kb_id, user_id=user_id).first()
+    kb = KnowledgeBase.get_visible_by_id(kb_id, user_id)
     if not kb:
         return error_response(404, 'Knowledge base not found')
     
@@ -75,14 +85,21 @@ def update_knowledge_base(kb_id):
     user_id = get_jwt_identity()
     data = request.get_json()
     
-    kb = KnowledgeBase.query.filter_by(id=kb_id, user_id=user_id).first()
+    user = User.query.get(user_id)
+    kb = KnowledgeBase.get_visible_by_id(kb_id, user_id)
     if not kb:
         return error_response(404, 'Knowledge base not found')
+    if not kb.can_edit(user):
+        return error_response(403, 'Permission denied')
     
     if 'name' in data:
         kb.name = data['name']
     if 'description' in data:
         kb.description = data['description']
+    if 'is_system' in data:
+        if not user or user.role != 'admin':
+            return error_response(403, 'Only admin can change shared flag')
+        kb.is_system = bool(data.get('is_system'))
     
     try:
         db.session.commit()
@@ -98,9 +115,12 @@ def delete_knowledge_base(kb_id):
     """Delete knowledge base and all its files"""
     user_id = get_jwt_identity()
     
-    kb = KnowledgeBase.query.filter_by(id=kb_id, user_id=user_id).first()
+    user = User.query.get(user_id)
+    kb = KnowledgeBase.get_visible_by_id(kb_id, user_id)
     if not kb:
         return error_response(404, 'Knowledge base not found')
+    if not kb.can_edit(user):
+        return error_response(403, 'Permission denied')
     
     try:
         # Delete vector collection
@@ -123,7 +143,7 @@ def get_knowledge_base_files(kb_id):
     """Get files in knowledge base"""
     user_id = get_jwt_identity()
     
-    kb = KnowledgeBase.query.filter_by(id=kb_id, user_id=user_id).first()
+    kb = KnowledgeBase.get_visible_by_id(kb_id, user_id)
     if not kb:
         return error_response(404, 'Knowledge base not found')
     

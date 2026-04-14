@@ -7,7 +7,7 @@ from sqlalchemy import or_, func
 
 from . import admin_bp
 from ..extensions import db
-from ..models import User, Conversation, Message
+from ..models import User, Conversation, Message, KnowledgeBase, CustomModel, ExternalModel
 from ..utils.decorators import admin_required, get_current_user
 from ..utils.response import success_response, error_response
 
@@ -251,3 +251,165 @@ def get_history_conversation_detail(conversation_id):
         },
         'messages': [message.to_dict() for message in messages]
     })
+
+
+@admin_bp.route('/knowledge-bases', methods=['GET'])
+@admin_required
+def get_admin_knowledge_bases():
+    """List knowledge bases created by admin users."""
+    keyword = request.args.get('keyword', '').strip()
+
+    query = db.session.query(KnowledgeBase, User).join(
+        User, KnowledgeBase.user_id == User.id
+    ).filter(
+        User.role == 'admin'
+    )
+
+    if keyword:
+        like_pattern = f'%{keyword}%'
+        query = query.filter(or_(
+            KnowledgeBase.name.ilike(like_pattern),
+            KnowledgeBase.description.ilike(like_pattern),
+            User.username.ilike(like_pattern)
+        ))
+
+    rows = query.order_by(KnowledgeBase.updated_at.desc()).all()
+    items = []
+    for kb, owner in rows:
+        item = kb.to_dict()
+        item['owner_username'] = owner.username if owner else ''
+        item['owner_email'] = owner.email if owner else ''
+        items.append(item)
+
+    return success_response(data=items)
+
+
+@admin_bp.route('/knowledge-bases/<kb_id>', methods=['PUT'])
+@admin_required
+def update_admin_knowledge_base(kb_id):
+    """Admin update for knowledge base metadata."""
+    kb = KnowledgeBase.query.get(kb_id)
+    if not kb:
+        return error_response(404, 'Knowledge base not found')
+
+    data = request.get_json() or {}
+    if 'name' in data:
+        kb.name = (data.get('name') or '').strip() or kb.name
+    if 'description' in data:
+        kb.description = (data.get('description') or '').strip()
+    if 'is_system' in data:
+        kb.is_system = bool(data.get('is_system'))
+
+    try:
+        db.session.commit()
+        return success_response(data=kb.to_dict(), message='Knowledge base updated')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(400, str(e))
+
+
+@admin_bp.route('/workspace/models', methods=['GET'])
+@admin_required
+def get_admin_workspace_models():
+    """List all admin-created local and external models."""
+    keyword = request.args.get('keyword', '').strip()
+
+    custom_query = db.session.query(CustomModel, User).join(
+        User, CustomModel.user_id == User.id
+    ).filter(User.role == 'admin')
+    external_query = db.session.query(ExternalModel, User).join(
+        User, ExternalModel.user_id == User.id
+    ).filter(User.role == 'admin')
+
+    if keyword:
+        like_pattern = f'%{keyword}%'
+        custom_query = custom_query.filter(or_(
+            CustomModel.name.ilike(like_pattern),
+            CustomModel.base_model.ilike(like_pattern),
+            CustomModel.description.ilike(like_pattern),
+            User.username.ilike(like_pattern)
+        ))
+        external_query = external_query.filter(or_(
+            ExternalModel.name.ilike(like_pattern),
+            ExternalModel.model_name.ilike(like_pattern),
+            ExternalModel.description.ilike(like_pattern),
+            User.username.ilike(like_pattern)
+        ))
+
+    items = []
+    for model, owner in custom_query.all():
+        item = model.to_dict(include_knowledge=True)
+        item['type'] = 'local'
+        item['owner_username'] = owner.username if owner else ''
+        item['owner_email'] = owner.email if owner else ''
+        items.append(item)
+
+    for model, owner in external_query.all():
+        item = model.to_dict(include_knowledge=True)
+        item['type'] = 'external'
+        item['owner_username'] = owner.username if owner else ''
+        item['owner_email'] = owner.email if owner else ''
+        items.append(item)
+
+    items.sort(key=lambda x: x.get('updated_at') or x.get('created_at') or '', reverse=True)
+    return success_response(data=items)
+
+
+@admin_bp.route('/workspace/custom-models/<model_id>', methods=['PUT'])
+@admin_required
+def update_admin_custom_model(model_id):
+    """Admin update for local custom model."""
+    model = CustomModel.query.get(model_id)
+    if not model:
+        return error_response(404, 'Custom model not found')
+
+    data = request.get_json() or {}
+    if 'name' in data:
+        model.name = (data.get('name') or '').strip() or model.name
+    if 'base_model' in data:
+        model.base_model = (data.get('base_model') or '').strip() or model.base_model
+    if 'system_prompt' in data:
+        model.system_prompt = data.get('system_prompt') or ''
+    if 'description' in data:
+        model.description = data.get('description') or ''
+    if 'is_system' in data:
+        model.is_system = bool(data.get('is_system'))
+
+    try:
+        db.session.commit()
+        return success_response(data=model.to_dict(include_knowledge=True), message='Model updated')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(400, str(e))
+
+
+@admin_bp.route('/workspace/external-models/<model_id>', methods=['PUT'])
+@admin_required
+def update_admin_external_model(model_id):
+    """Admin update for external model."""
+    model = ExternalModel.query.get(model_id)
+    if not model:
+        return error_response(404, 'External model not found')
+
+    data = request.get_json() or {}
+    if 'name' in data:
+        model.name = (data.get('name') or '').strip() or model.name
+    if 'model_name' in data:
+        model.model_name = (data.get('model_name') or '').strip() or model.model_name
+    if 'api_base_url' in data:
+        model.api_base_url = (data.get('api_base_url') or '').strip() or model.api_base_url
+    if data.get('api_key'):
+        model.api_key = data['api_key']
+    if 'system_prompt' in data:
+        model.system_prompt = data.get('system_prompt') or ''
+    if 'description' in data:
+        model.description = data.get('description') or ''
+    if 'is_system' in data:
+        model.is_system = bool(data.get('is_system'))
+
+    try:
+        db.session.commit()
+        return success_response(data=model.to_dict(include_knowledge=True), message='External model updated')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(400, str(e))

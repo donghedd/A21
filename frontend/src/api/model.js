@@ -15,6 +15,13 @@ export function getCustomModels() {
 }
 
 /**
+ * Get user's external models
+ */
+export function getExternalModels() {
+  return request.get('/models/external')
+}
+
+/**
  * Create custom model
  */
 export function createCustomModel(data) {
@@ -43,6 +50,31 @@ export function deleteCustomModel(id) {
 }
 
 /**
+ * Create external model
+ */
+export function createExternalModel(data) {
+  return request.post('/models/external', data)
+}
+
+/**
+ * Update external model
+ */
+export function updateExternalModel(id, data) {
+  return request.put(`/models/external/${id}`, data)
+}
+
+/**
+ * Delete external model
+ */
+export function deleteExternalModel(id) {
+  return request.delete(`/models/external/${id}`)
+}
+
+export function testExternalModel(id) {
+  return request.post(`/models/external/${id}/test`)
+}
+
+/**
  * Bind knowledge base to model
  */
 export function bindKnowledgeBase(modelId, knowledgeBaseId) {
@@ -56,4 +88,14 @@ export function bindKnowledgeBase(modelId, knowledgeBaseId) {
  */
 export function unbindKnowledgeBase(modelId, knowledgeBaseId) {
   return request.delete(`/models/custom/${modelId}/knowledge/${knowledgeBaseId}`)
+}
+
+export function bindExternalKnowledgeBase(modelId, knowledgeBaseId) {
+  return request.post(`/models/external/${modelId}/knowledge`, {
+    knowledge_base_id: knowledgeBaseId
+  })
+}
+
+export function unbindExternalKnowledgeBase(modelId, knowledgeBaseId) {
+  return request.delete(`/models/external/${modelId}/knowledge/${knowledgeBaseId}`)
 }

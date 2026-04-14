@@ -23,3 +23,23 @@ export function searchHistoryConversations(params) {
 export function getHistoryConversationDetail(conversationId) {
   return request.get(`/admin/history/conversations/${conversationId}`)
 }
+
+export function getAdminKnowledgeBases(params = {}) {
+  return request.get('/admin/knowledge-bases', { params })
+}
+
+export function updateAdminKnowledgeBase(id, data) {
+  return request.put(`/admin/knowledge-bases/${id}`, data)
+}
+
+export function getAdminWorkspaceModels(params = {}) {
+  return request.get('/admin/workspace/models', { params })
+}
+
+export function updateAdminCustomModel(id, data) {
+  return request.put(`/admin/workspace/custom-models/${id}`, data)
+}
+
+export function updateAdminExternalModel(id, data) {
+  return request.put(`/admin/workspace/external-models/${id}`, data)
+}

@@ -65,7 +65,7 @@ export function exportConversation(id, format = 'json') {
  * Send message with SSE streaming
  * Returns EventSource-like reader
  */
-export function sendMessageStream(conversationId, content, model = null, customModelId = null, signal = null) {
+export function sendMessageStream(conversationId, content, model = null, customModelId = null, externalModelId = null, signal = null) {
   const token = getToken()
   const url = `${API_BASE}/chat/conversations/${conversationId}/messages`
   
@@ -75,7 +75,7 @@ export function sendMessageStream(conversationId, content, model = null, customM
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ content, model, custom_model_id: customModelId })
+    body: JSON.stringify({ content, model, custom_model_id: customModelId, external_model_id: externalModelId })
   }
   if (signal) options.signal = signal
   
@@ -92,7 +92,7 @@ export function deleteMessagesFrom(conversationId, messageId) {
 /**
  * Regenerate last assistant response with SSE streaming
  */
-export function regenerateResponse(conversationId, model = null, customModelId = null, signal = null) {
+export function regenerateResponse(conversationId, model = null, customModelId = null, externalModelId = null, signal = null) {
   const token = getToken()
   const url = `${API_BASE}/chat/conversations/${conversationId}/regenerate`
   
@@ -102,7 +102,7 @@ export function regenerateResponse(conversationId, model = null, customModelId =
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ model, custom_model_id: customModelId })
+    body: JSON.stringify({ model, custom_model_id: customModelId, external_model_id: externalModelId })
   }
   if (signal) options.signal = signal
   

@@ -54,6 +54,10 @@
           <el-icon><Setting /></el-icon>
           <span>工作空间</span>
         </div>
+        <div class="nav-item" :class="{ active: isRouteActive('/history') }" @click="navigateToPanel('/history')">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>对话历史管理</span>
+        </div>
       </nav>
 
       <!-- 会话列表 -->
@@ -74,7 +78,7 @@
           >
             <div
               class="conv-item"
-              :class="{ active: conv.id === currentConversationId }"
+              :class="{ active: isChatHomeRoute && conv.id === currentConversationId }"
               @click="selectConversation(conv.id)"
             >
               <el-icon class="conv-icon"><ChatDotRound /></el-icon>
@@ -503,13 +507,15 @@ let isLoadingConversation = false
 // 方法
 async function loadModels() {
   try {
-    const [ollamaRes, customRes] = await Promise.all([
+    const [ollamaRes, customRes, externalRes] = await Promise.all([
       getOrFetch('models:ollama', () => modelApi.getOllamaModels(), CACHE_TTL.MODELS),
-      getOrFetch('models:custom', () => modelApi.getCustomModels(), CACHE_TTL.MODELS)
+      getOrFetch('models:custom', () => modelApi.getCustomModels(), CACHE_TTL.MODELS),
+      getOrFetch('models:external', () => modelApi.getExternalModels(), CACHE_TTL.MODELS)
     ])
 
     const ollamaData = (ollamaRes?.data || ollamaRes || [])
     const customData = (customRes?.data || customRes || [])
+    const externalData = (externalRes?.data || externalRes || [])
 
     const ollamaList = (Array.isArray(ollamaData) ? ollamaData : []).map(m => ({
       id: m.name || m.model,
@@ -522,10 +528,21 @@ async function loadModels() {
       name: m.name,
       type: 'custom',
       base_model: m.base_model,
-      system_prompt: m.system_prompt
+      system_prompt: m.system_prompt,
+      knowledge_bases: m.knowledge_bases || []
     }))
 
-    availableModels.value = [...customList, ...ollamaList]
+    const externalList = (Array.isArray(externalData) ? externalData : []).map(m => ({
+      id: m.id,
+      name: m.name,
+      type: 'external',
+      model_name: m.model_name,
+      api_base_url: m.api_base_url,
+      system_prompt: m.system_prompt,
+      knowledge_bases: m.knowledge_bases || []
+    }))
+
+    availableModels.value = [...customList, ...externalList, ...ollamaList]
 
     if (!selectedModel.value && availableModels.value.length > 0) {
       const savedDefault = getItem('sfqa_default_model')
@@ -684,6 +701,11 @@ async function selectConversation(id) {
         if (customModel) {
           selectedModel.value = conversationData.custom_model_id
         }
+      } else if (conversationData?.external_model_id) {
+        const externalModel = availableModels.value.find(m => m.id === conversationData.external_model_id)
+        if (externalModel) {
+          selectedModel.value = conversationData.external_model_id
+        }
       }
     } catch (error) {
       console.error('Failed to load conversation:', error)
@@ -703,6 +725,8 @@ async function handleSend({ content, model }) {
       const createData = { title: content.slice(0, 50) }
       if (modelInfo?.type === 'custom') {
         createData.custom_model_id = model
+      } else if (modelInfo?.type === 'external') {
+        createData.external_model_id = model
       }
 
       const res = await chatApi.createConversation(createData)
@@ -760,10 +784,14 @@ async function handleSend({ content, model }) {
 
     let modelParam = null
     let customModelIdParam = null
+    let externalModelIdParam = null
 
     if (modelInfo?.type === 'custom') {
       customModelIdParam = model
       modelParam = modelInfo.base_model || null
+    } else if (modelInfo?.type === 'external') {
+      externalModelIdParam = model
+      modelParam = modelInfo.model_name || modelInfo.name || null
     } else {
       modelParam = model
     }
@@ -773,6 +801,7 @@ async function handleSend({ content, model }) {
       content,
       modelParam,
       customModelIdParam,
+      externalModelIdParam,
       signal
     )
 
@@ -919,11 +948,15 @@ async function handleRegenerate(item) {
     // 修复模型参数传递：正确区分 ollama 模型和自定义模型
     let modelParam = null
     let customModelIdParam = null
+    let externalModelIdParam = null
 
     if (modelInfo?.type === 'custom') {
       // 自定义模型：使用 base_model 作为 model 参数，custom_model_id 作为自定义模型ID
       customModelIdParam = selectedModel.value
       modelParam = modelInfo.base_model || null
+    } else if (modelInfo?.type === 'external') {
+      externalModelIdParam = selectedModel.value
+      modelParam = modelInfo.model_name || modelInfo.name || null
     } else if (modelInfo?.type === 'ollama') {
       // Ollama 基础模型
       modelParam = selectedModel.value
@@ -936,6 +969,7 @@ async function handleRegenerate(item) {
       currentId,
       modelParam,
       customModelIdParam,
+      externalModelIdParam,
       signal
     )
 

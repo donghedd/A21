@@ -11,9 +11,10 @@ from flask import current_app
 import logging
 
 from ..extensions import db
-from ..models import Conversation, Message, CustomModel, KnowledgeBase, ModelKnowledgeBinding
+from ..models import Conversation, Message, CustomModel, KnowledgeBase, ModelKnowledgeBinding, ExternalModel, ExternalModelKnowledgeBinding
 from .rag_service import get_rag_service
 from .llm_factory import get_llm_service
+from .external_model_service import get_external_model_service
 from ..utils.rag_template import format_rag_prompt
 
 logger = logging.getLogger(__name__)
@@ -138,12 +139,42 @@ class ChatService:
                                custom_model_id: str = None,
                                external_model_id: str = None) -> Dict[str, Any]:
         """Resolve the effective model and sync conversation-level model bindings."""
-        del external_model_id
-
         custom_model = None
+        external_model = None
         base_model = model or self.llm_service.get_default_model()
         system_prompt = None
         effective_custom_model_id = custom_model_id or conversation.custom_model_id
+        effective_external_model_id = external_model_id or conversation.external_model_id
+        provider = 'local'
+        external_service = None
+
+        if effective_external_model_id:
+            external_model = ExternalModel.query.get(effective_external_model_id)
+            if external_model:
+                provider = 'external'
+                base_model = external_model.model_name or model or external_model.name
+                system_prompt = external_model.system_prompt
+                external_service = get_external_model_service(
+                    api_key=external_model.api_key,
+                    base_url=external_model.api_base_url
+                )
+                if (
+                    conversation.external_model_id != external_model.id
+                    or conversation.custom_model_id is not None
+                ):
+                    conversation.external_model_id = external_model.id
+                    conversation.custom_model_id = None
+                    db.session.commit()
+                return {
+                    'base_model': base_model,
+                    'system_prompt': system_prompt,
+                    'custom_model': None,
+                    'custom_model_id': None,
+                    'external_model': external_model,
+                    'external_model_id': external_model.id,
+                    'provider': provider,
+                    'external_service': external_service,
+                }
 
         if conversation.external_model_id is not None:
             conversation.external_model_id = None
@@ -167,10 +198,18 @@ class ChatService:
             'system_prompt': system_prompt,
             'custom_model': custom_model,
             'custom_model_id': custom_model.id if custom_model else None,
+            'external_model': external_model,
+            'external_model_id': external_model.id if external_model else None,
+            'provider': provider,
+            'external_service': external_service,
         }
 
-    def _stream_response(self, base_model: str, messages: List[Dict[str, str]]) -> Generator[Dict[str, Any], None, None]:
+    def _stream_response(self, base_model: str, messages: List[Dict[str, str]],
+                         provider: str = 'local', external_service=None) -> Generator[Dict[str, Any], None, None]:
         """Stream response from the configured LLM provider."""
+        if provider == 'external' and external_service is not None:
+            yield from external_service.chat_stream(base_model, messages)
+            return
         yield from self.llm_service.chat_stream(base_model, messages)
     
     # ==================== Conversation CRUD ====================
@@ -196,13 +235,15 @@ class ChatService:
         }
     
     def create_conversation(self, user_id: str, title: str = None,
-                            custom_model_id: str = None) -> Conversation:
+                            custom_model_id: str = None,
+                            external_model_id: str = None) -> Conversation:
         """Create a new conversation"""
         conversation = Conversation(
             id=str(uuid.uuid4()),
             user_id=user_id,
             title=title or 'New Conversation',
-            custom_model_id=custom_model_id
+            custom_model_id=custom_model_id,
+            external_model_id=external_model_id
         )
         db.session.add(conversation)
         db.session.commit()
@@ -217,7 +258,8 @@ class ChatService:
         ).first()
     
     def update_conversation(self, conversation_id: str, user_id: str,
-                            title: str = None, custom_model_id: str = None) -> Optional[Conversation]:
+                            title: str = None, custom_model_id: str = None,
+                            external_model_id: str = None) -> Optional[Conversation]:
         """Update conversation details"""
         conversation = self.get_conversation(conversation_id, user_id)
         if not conversation:
@@ -227,6 +269,12 @@ class ChatService:
             conversation.title = title
         if custom_model_id is not None:
             conversation.custom_model_id = custom_model_id if custom_model_id else None
+            if custom_model_id:
+                conversation.external_model_id = None
+        if external_model_id is not None:
+            conversation.external_model_id = external_model_id if external_model_id else None
+            if external_model_id:
+                conversation.custom_model_id = None
         
         db.session.commit()
         return conversation
@@ -311,7 +359,8 @@ class ChatService:
     
     # ==================== RAG-Enhanced Chat ====================
     
-    def get_rag_context(self, query: str, custom_model_id: str = None) -> tuple:
+    def get_rag_context(self, query: str, custom_model_id: str = None,
+                        external_model_id: str = None) -> tuple:
         """
         Get RAG context for a query based on model's knowledge bases
         Returns: (context_text, sources)
@@ -320,15 +369,21 @@ class ChatService:
         logger.info(f"=== RAG检索开始 ===")
         logger.info(f"查询: {query[:50]}...")
         logger.info(f"自定义模型ID: {custom_model_id}")
+        logger.info(f"云端模型ID: {external_model_id}")
 
-        if not custom_model_id:
-            logger.warning("没有提供custom_model_id，跳过RAG检索")
+        if not custom_model_id and not external_model_id:
+            logger.warning("没有提供模型ID，跳过RAG检索")
             return '', []
 
         # Get bound knowledge bases
-        bindings = ModelKnowledgeBinding.query.filter_by(
-            custom_model_id=custom_model_id
-        ).all()
+        if custom_model_id:
+            bindings = ModelKnowledgeBinding.query.filter_by(
+                custom_model_id=custom_model_id
+            ).all()
+        else:
+            bindings = ExternalModelKnowledgeBinding.query.filter_by(
+                external_model_id=external_model_id
+            ).all()
 
         logger.info(f"找到 {len(bindings)} 个知识库绑定")
 
@@ -534,12 +589,18 @@ If the context doesn't contain relevant information, answer based on your genera
             base_model = model_context['base_model']
             system_prompt = model_context['system_prompt']
             effective_custom_model_id = model_context['custom_model_id']
+            effective_external_model_id = model_context['external_model_id']
+            provider = model_context.get('provider', 'local')
+            external_service = model_context.get('external_service')
 
             logger.info("=== Chat Stream Started ===")
             logger.info(f"用户消息: {user_message[:50]}...")
             logger.info(f"请求中的custom_model_id: {custom_model_id}")
+            logger.info(f"请求中的external_model_id: {external_model_id}")
             logger.info(f"对话中的custom_model_id: {conversation.custom_model_id}")
+            logger.info(f"对话中的external_model_id: {conversation.external_model_id}")
             logger.info(f"effective_custom_model_id: {effective_custom_model_id}")
+            logger.info(f"effective_external_model_id: {effective_external_model_id}")
             logger.info(f"base_model: {base_model}")
             # Save user message
             user_msg = self.add_message(conversation_id, 'user', user_message)
@@ -555,7 +616,8 @@ If the context doesn't contain relevant information, answer based on your genera
 
             # Step 1: Classify question
             try:
-                classifier = QuestionClassifier(self.llm_service)
+                classifier_service = external_service if provider == 'external' and external_service else self.llm_service
+                classifier = QuestionClassifier(classifier_service)
                 classification = classifier.classify(user_message, base_model)
                 question_type = classification.get('type', 'KNOWLEDGE')
                 logger.info(f"Question classified as: {question_type}")
@@ -564,9 +626,13 @@ If the context doesn't contain relevant information, answer based on your genera
                 classification = {'type': 'KNOWLEDGE', 'keywords': []}
 
             # Step 2: Get RAG context (only for KNOWLEDGE type questions)
-            if classification.get('type', 'KNOWLEDGE') == 'KNOWLEDGE' and effective_custom_model_id:
+            if classification.get('type', 'KNOWLEDGE') == 'KNOWLEDGE' and (effective_custom_model_id or effective_external_model_id):
                 try:
-                    context, sources = self.get_rag_context(user_message, effective_custom_model_id)
+                    context, sources = self.get_rag_context(
+                        user_message,
+                        effective_custom_model_id,
+                        effective_external_model_id
+                    )
                     logger.info(f"RAG检索完成: context长度={len(context)}, sources数量={len(sources) if sources else 0}")
                 except Exception as e:
                     logger.warning(f"RAG context retrieval failed: {e}")
@@ -640,7 +706,7 @@ If the context doesn't contain relevant information, answer based on your genera
             last_save_time = time.time()
             save_interval = 2.0  # Save every 2 seconds
 
-            for chunk in self._stream_response(base_model, messages):
+            for chunk in self._stream_response(base_model, messages, provider=provider, external_service=external_service):
                 if 'message' in chunk:
                     msg = chunk['message']
 
@@ -822,13 +888,16 @@ If the context doesn't contain relevant information, answer based on your genera
             base_model = model_context['base_model']
             system_prompt = model_context['system_prompt']
             effective_custom_model_id = model_context['custom_model_id']
+            provider = model_context.get('provider', 'local')
+            external_service = model_context.get('external_service')
 
             question_type = 'GENERAL'
             keywords = []
             context, sources = '', []
 
             try:
-                classifier = QuestionClassifier(self.llm_service)
+                classifier_service = external_service if provider == 'external' and external_service else self.llm_service
+                classifier = QuestionClassifier(classifier_service)
                 classification = classifier.classify(user_message, base_model)
                 question_type = classification.get('type', 'KNOWLEDGE')
                 keywords = classification.get('keywords', [])
@@ -838,9 +907,13 @@ If the context doesn't contain relevant information, answer based on your genera
                 question_type = classification['type']
                 keywords = classification['keywords']
 
-            if question_type == 'KNOWLEDGE' and effective_custom_model_id:
+            if question_type == 'KNOWLEDGE' and (effective_custom_model_id or effective_external_model_id):
                 try:
-                    context, sources = self.get_rag_context(user_message, effective_custom_model_id)
+                    context, sources = self.get_rag_context(
+                        user_message,
+                        effective_custom_model_id,
+                        effective_external_model_id
+                    )
                 except Exception as e:
                     logger.warning(f"RAG context retrieval failed: {e}")
                     context, sources = '', []
@@ -891,7 +964,7 @@ If the context doesn't contain relevant information, answer based on your genera
             last_save_time = time.time()
             save_interval = 2.0
 
-            for chunk in self._stream_response(base_model, messages):
+            for chunk in self._stream_response(base_model, messages, provider=provider, external_service=external_service):
                 if 'message' in chunk:
                     msg = chunk['message']
 

@@ -27,7 +27,7 @@
     <!-- 自定义模型区 -->
     <section class="section">
       <div class="section-head">
-        <h3 class="section-title">我的自定义模型</h3>
+        <h3 class="section-title">我的模型</h3>
         <el-button type="primary" @click="openCreateDialog()" class="primary-btn">
           <el-icon><Plus /></el-icon>
           新建模型
@@ -49,6 +49,9 @@
                   <el-dropdown-item command="edit">
                     <el-icon><Edit /></el-icon>编辑
                   </el-dropdown-item>
+                  <el-dropdown-item v-if="m.type === 'external'" command="test">
+                    <el-icon><Check /></el-icon>测试连通
+                  </el-dropdown-item>
                   <el-dropdown-item command="kb">
                     <el-icon><FolderOpened /></el-icon>知识库绑定
                   </el-dropdown-item>
@@ -63,9 +66,14 @@
           <p class="model-desc">{{ m.description || '暂无描述' }}</p>
 
           <div class="model-tags">
-            <el-tag size="small" type="primary" effect="light" class="base-tag">{{ m.base_model }}</el-tag>
+            <el-tag size="small" :type="m.type === 'external' ? 'warning' : 'primary'" effect="light" class="base-tag">
+              {{ m.type === 'external' ? '云端模型' : '本地模型' }}
+            </el-tag>
+            <el-tag size="small" type="primary" effect="light" class="base-tag">
+              {{ m.type === 'external' ? (m.model_name || m.name) : m.base_model }}
+            </el-tag>
             <el-tag size="small" type="info" effect="light" class="kb-tag">
-              {{ m.knowledge_bases?.length || 0 }} 个知识库
+              {{ `${m.knowledge_bases?.length || 0} 个知识库` }}
             </el-tag>
           </div>
 
@@ -97,29 +105,62 @@
         <p class="dialog-subtitle">{{ editingModel ? '修改自定义模型的配置信息' : '创建一个新的自定义模型用于对话' }}</p>
       </div>
       <el-form :model="modelForm" label-position="top" class="custom-form">
+        <el-form-item label="模型名称" required>
+          <el-input 
+            v-model="modelForm.name" 
+            placeholder="输入模型名称" 
+            maxlength="30" 
+            show-word-limit
+            class="dialog-input"
+          >
+            <template #prefix>
+              <el-icon><Document /></el-icon>
+            </template>
+          </el-input>
+        </el-form-item>
         <div class="form-row">
-          <el-form-item label="模型名称" required class="form-item-half">
-            <el-input 
-              v-model="modelForm.name" 
-              placeholder="输入模型名称" 
-              maxlength="30" 
-              show-word-limit
-              class="dialog-input"
-            >
-              <template #prefix>
-                <el-icon><Document /></el-icon>
-              </template>
-            </el-input>
+          <el-form-item label="模型来源" required class="form-item-half">
+            <el-radio-group v-model="modelForm.type" class="provider-radio-group" :disabled="Boolean(editingModel)">
+              <el-radio-button label="local">本地大模型</el-radio-button>
+              <el-radio-button label="external">云端大模型</el-radio-button>
+            </el-radio-group>
           </el-form-item>
-          <el-form-item label="基础模型" required class="form-item-half">
-            <el-select 
-              v-model="modelForm.base_model" 
-              placeholder="选择基础模型" 
-              style="width: 100%" 
+          <el-form-item :label="modelForm.type === 'external' ? '云端模型名称' : '本地模型名称'" required class="form-item-half">
+            <el-select
+              v-if="modelForm.type === 'local'"
+              v-model="modelForm.base_model"
+              placeholder="选择本地模型"
+              style="width: 100%"
               class="custom-select dialog-select"
             >
               <el-option v-for="m in ollamaModels" :key="m.name" :label="m.name" :value="m.name" />
             </el-select>
+            <el-input
+              v-else
+              v-model="modelForm.model_name"
+              placeholder="例如 gpt-4o-mini / qwen-max / deepseek-chat"
+              class="dialog-input"
+            />
+          </el-form-item>
+        </div>
+        <div v-if="modelForm.type === 'external'" class="form-row">
+          <el-form-item label="API 基地址" class="form-item-half">
+            <el-input
+              v-model="modelForm.api_base_url"
+              placeholder="例如 https://api.openai.com/v1"
+              class="dialog-input"
+            />
+          </el-form-item>
+          <el-form-item label="API 密钥" required class="form-item-half">
+            <el-input
+              v-model="modelForm.api_key"
+              type="password"
+              show-password
+              :placeholder="editingModel?.type === 'external'
+                ? (externalKeyMasked ? `已保存：${externalKeyMasked}，留空则保留原密钥` : '编辑时可留空，保留原密钥')
+                : '输入 API Key'"
+              class="dialog-input"
+            />
           </el-form-item>
         </div>
         <el-form-item label="系统提示词">
@@ -225,7 +266,17 @@ const allKbs = ref([])
 
 const showModelDialog = ref(false)
 const editingModel = ref(null)
-const modelForm = reactive({ name: '', base_model: '', system_prompt: '', description: '' })
+const modelForm = reactive({
+  type: 'local',
+  name: '',
+  base_model: '',
+  model_name: '',
+  api_key: '',
+  api_base_url: 'https://api.openai.com/v1',
+  system_prompt: '',
+  description: ''
+})
+const externalKeyMasked = ref('')
 
 const showKbDialog = ref(false)
 const currentModel = ref(null)
@@ -263,9 +314,14 @@ async function loadCustomModels() {
   }
 
   try {
-    const res = await modelApi.getCustomModels()
-    customModels.value = res.data || []
-    setCache('models:custom', res, 5 * 60 * 1000)
+    const [customRes, externalRes] = await Promise.all([
+      modelApi.getCustomModels(),
+      modelApi.getExternalModels()
+    ])
+    const localModels = (customRes.data || []).map(m => ({ ...m, type: 'local' }))
+    const externalModels = (externalRes.data || []).map(m => ({ ...m, type: 'external' }))
+    customModels.value = [...externalModels, ...localModels]
+    setCache('models:custom', { data: customModels.value }, 5 * 60 * 1000)
   }
   catch (e) {} finally { loadingCustom.value = false }
 }
@@ -285,28 +341,74 @@ async function loadAllKbs() {
 
 function openCreateDialog(m) {
   editingModel.value = m || null
-  Object.assign(modelForm, m ? { name: m.name, base_model: m.base_model, system_prompt: m.system_prompt || '', description: m.description || '' } : { name: '', base_model: '', system_prompt: '', description: '' })
+  externalKeyMasked.value = m?.api_key_masked || ''
+  Object.assign(modelForm, m ? {
+    type: m.type || 'local',
+    name: m.name,
+    base_model: m.base_model || '',
+    model_name: m.model_name || '',
+    api_key: '',
+    api_base_url: m.api_base_url || 'https://api.openai.com/v1',
+    system_prompt: m.system_prompt || '',
+    description: m.description || ''
+  } : {
+    type: 'local',
+    name: '',
+    base_model: '',
+    model_name: '',
+    api_key: '',
+    api_base_url: 'https://api.openai.com/v1',
+    system_prompt: '',
+    description: ''
+  })
   showModelDialog.value = true
 }
 
 function onModelCmd(cmd, m) {
   if (cmd === 'edit') openCreateDialog(m)
+  else if (cmd === 'test') testModelConnection(m)
   else if (cmd === 'kb') openKbDialog(m)
   else if (cmd === 'del') deleteModel(m)
 }
 
 async function saveModel() {
-  if (!modelForm.name || !modelForm.base_model) return ElMessage.warning('请填写必填项')
+  if (!modelForm.name) return ElMessage.warning('请填写模型名称')
+  if (modelForm.type === 'local' && !modelForm.base_model) return ElMessage.warning('请选择本地模型')
+  if (modelForm.type === 'external' && !modelForm.model_name) return ElMessage.warning('请填写云端模型名称')
+  if (modelForm.type === 'external' && !editingModel.value && !modelForm.api_key) return ElMessage.warning('云端模型创建时 API 密钥必填')
   saving.value = true
   try {
+    const payload = {
+      name: modelForm.name,
+      system_prompt: modelForm.system_prompt,
+      description: modelForm.description
+    }
+
+    if (modelForm.type === 'local') {
+      payload.base_model = modelForm.base_model
+    } else {
+      payload.model_name = modelForm.model_name
+      payload.api_base_url = modelForm.api_base_url
+      if (modelForm.api_key) payload.api_key = modelForm.api_key
+    }
+
     if (editingModel.value) {
-      await modelApi.updateCustomModel(editingModel.value.id, modelForm)
+      if (editingModel.value.type === 'external') {
+        await modelApi.updateExternalModel(editingModel.value.id, payload)
+      } else {
+        await modelApi.updateCustomModel(editingModel.value.id, payload)
+      }
       ElMessage.success('已更新')
     } else {
-      await modelApi.createCustomModel(modelForm)
+      if (modelForm.type === 'external') {
+        await modelApi.createExternalModel(payload)
+      } else {
+        await modelApi.createCustomModel(payload)
+      }
       ElMessage.success('已创建')
     }
     invalidateCache('models:custom')
+    invalidateCache('models:external')
     showModelDialog.value = false
     loadCustomModels()
   } catch { ElMessage.error('保存失败') } finally { saving.value = false }
@@ -315,11 +417,27 @@ async function saveModel() {
 async function deleteModel(m) {
   try {
     await ElMessageBox.confirm(`确定删除「${m.name}」？`, '确认', { type: 'warning' })
-    await modelApi.deleteCustomModel(m.id)
+    if (m.type === 'external') {
+      await modelApi.deleteExternalModel(m.id)
+    } else {
+      await modelApi.deleteCustomModel(m.id)
+    }
     customModels.value = customModels.value.filter(x => x.id !== m.id)
     invalidateCache('models:custom')
+    invalidateCache('models:external')
     ElMessage.success('已删除')
   } catch {}
+}
+
+async function testModelConnection(m) {
+  if (m.type !== 'external') return
+  try {
+    const res = await modelApi.testExternalModel(m.id)
+    const baseUrl = res.data?.base_url || m.api_base_url || ''
+    ElMessage.success(`连通成功: ${baseUrl}`)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '连通失败')
+  }
 }
 
 function openKbDialog(m) {
@@ -329,7 +447,11 @@ function openKbDialog(m) {
 
 async function bindKb(kb) {
   try {
-    await modelApi.bindKnowledgeBase(currentModel.value.id, kb.id)
+    if (currentModel.value.type === 'external') {
+      await modelApi.bindExternalKnowledgeBase(currentModel.value.id, kb.id)
+    } else {
+      await modelApi.bindKnowledgeBase(currentModel.value.id, kb.id)
+    }
     if (!currentModel.value.knowledge_bases) currentModel.value.knowledge_bases = []
     currentModel.value.knowledge_bases.push(kb)
     ElMessage.success('已绑定')
@@ -338,7 +460,11 @@ async function bindKb(kb) {
 
 async function unbindKb(kb) {
   try {
-    await modelApi.unbindKnowledgeBase(currentModel.value.id, kb.id)
+    if (currentModel.value.type === 'external') {
+      await modelApi.unbindExternalKnowledgeBase(currentModel.value.id, kb.id)
+    } else {
+      await modelApi.unbindKnowledgeBase(currentModel.value.id, kb.id)
+    }
     currentModel.value.knowledge_bases = currentModel.value.knowledge_bases.filter(k => k.id !== kb.id)
     ElMessage.success('已解绑')
   } catch { ElMessage.error('解绑失败') }
@@ -667,6 +793,7 @@ onMounted(() => {
     }
   }
 }
+
 
 .form-row {
   display: flex;

@@ -7,7 +7,7 @@ import threading
 from . import file_bp
 from ..utils.response import success_response, error_response
 from ..services import get_file_service
-from ..models import File
+from ..models import File, User
 from ..extensions import db
 
 
@@ -84,7 +84,10 @@ def get_file_status(file_id):
     """Get file processing status"""
     user_id = get_jwt_identity()
     
-    file_record = File.query.filter_by(id=file_id, user_id=user_id).first()
+    user = User.query.get(user_id)
+    file_record = File.query.filter_by(id=file_id).first()
+    if file_record and file_record.user_id != user_id and (not user or user.role != 'admin'):
+        file_record = None
     if not file_record:
         return error_response(404, 'File not found')
     
@@ -97,7 +100,10 @@ def stream_file_status(file_id):
     """Stream file processing status (SSE)"""
     user_id = get_jwt_identity()
     
-    file_record = File.query.filter_by(id=file_id, user_id=user_id).first()
+    user = User.query.get(user_id)
+    file_record = File.query.filter_by(id=file_id).first()
+    if file_record and file_record.user_id != user_id and (not user or user.role != 'admin'):
+        file_record = None
     if not file_record:
         return Response(
             f"data: {json.dumps({'error': 'File not found'})}\n\n",
@@ -163,7 +169,10 @@ def reprocess_file(file_id):
     """Reprocess a file"""
     user_id = get_jwt_identity()
     
-    file_record = File.query.filter_by(id=file_id, user_id=user_id).first()
+    user = User.query.get(user_id)
+    file_record = File.query.filter_by(id=file_id).first()
+    if file_record and file_record.user_id != user_id and (not user or user.role != 'admin'):
+        file_record = None
     if not file_record:
         return error_response(404, 'File not found')
     

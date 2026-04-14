@@ -362,12 +362,26 @@ const bubbleList = computed(() => {
 const modelGroups = computed(() => {
   const groups = []
   const customModels = props.models.filter(m => m.type === 'custom')
+  const externalModels = props.models.filter(m => m.type === 'external')
   const ollamaModels = props.models.filter(m => m.type === 'ollama')
   
   if (customModels.length) {
     groups.push({
       label: '自定义模型',
-      models: customModels.map(m => ({ ...m, tag: m.base_model }))
+      models: customModels.map(m => ({
+        ...m,
+        tag: [m.base_model, `${m.knowledge_bases?.length || 0}库`].filter(Boolean).join(' | ')
+      }))
+    })
+  }
+
+  if (externalModels.length) {
+    groups.push({
+      label: '云端模型',
+      models: externalModels.map(m => ({
+        ...m,
+        tag: [m.model_name || m.name, `${m.knowledge_bases?.length || 0}库`].filter(Boolean).join(' | ')
+      }))
     })
   }
   

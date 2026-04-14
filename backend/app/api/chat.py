@@ -40,12 +40,14 @@ def create_conversation():
     
     title = data.get('title')
     custom_model_id = data.get('custom_model_id')
+    external_model_id = data.get('external_model_id')
     
     chat_service = get_chat_service()
     conversation = chat_service.create_conversation(
         user_id=user_id,
         title=title,
-        custom_model_id=custom_model_id
+        custom_model_id=custom_model_id,
+        external_model_id=external_model_id
     )
     
     return success_response(
@@ -82,7 +84,8 @@ def update_conversation(conversation_id):
         conversation_id=conversation_id,
         user_id=user_id,
         title=data.get('title'),
-        custom_model_id=data.get('custom_model_id')
+        custom_model_id=data.get('custom_model_id'),
+        external_model_id=data.get('external_model_id')
     )
     
     if not conversation:
@@ -156,6 +159,7 @@ def send_message(conversation_id):
     user_message = data['content']
     model = data.get('model')  # Optional model override
     custom_model_id = data.get('custom_model_id')  # Optional custom model
+    external_model_id = data.get('external_model_id')
 
     # 调试日志
     import logging
@@ -164,6 +168,7 @@ def send_message(conversation_id):
     logger.info(f"用户消息: {user_message[:50]}...")
     logger.info(f"model参数: {model}")
     logger.info(f"custom_model_id参数: {custom_model_id}")
+    logger.info(f"external_model_id参数: {external_model_id}")
 
     chat_service = get_chat_service()
     app = current_app._get_current_object()
@@ -175,7 +180,8 @@ def send_message(conversation_id):
                 user_id=user_id,
                 user_message=user_message,
                 model=model,
-                custom_model_id=custom_model_id
+                custom_model_id=custom_model_id,
+                external_model_id=external_model_id
             ):
                 yield event
     
@@ -219,6 +225,7 @@ def regenerate_response(conversation_id):
     data = request.get_json() or {}
     model = data.get('model')
     custom_model_id = data.get('custom_model_id')  # Optional custom model
+    external_model_id = data.get('external_model_id')
     
     chat_service = get_chat_service()
     app = current_app._get_current_object()
@@ -229,7 +236,8 @@ def regenerate_response(conversation_id):
                 conversation_id=conversation_id,
                 user_id=user_id,
                 model=model,
-                custom_model_id=custom_model_id
+                custom_model_id=custom_model_id,
+                external_model_id=external_model_id
             ):
                 yield event
     

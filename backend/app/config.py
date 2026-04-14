@@ -85,7 +85,12 @@ class Config:
         os.path.dirname(os.path.dirname(__file__)),
         os.getenv('UPLOAD_FOLDER', 'uploads')
     )
-    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt', 'md', 'xlsx', 'xls'}
+    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt', 'md', 'xlsx', 'xls', 'json'}
+    ENABLE_PDF_OCR = os.getenv('ENABLE_PDF_OCR', 'true').lower() == 'true'
+    PDF_OCR_DPI = int(os.getenv('PDF_OCR_DPI', 200))
+    PDF_OCR_MIN_TEXT_CHARS = int(os.getenv('PDF_OCR_MIN_TEXT_CHARS', 20))
+    PDF_OCR_LANGUAGE = os.getenv('PDF_OCR_LANGUAGE', 'chi_sim+eng')
+    TESSERACT_CMD = os.getenv('TESSERACT_CMD', '').strip() or None
     
     # Chroma Vector DB
     CHROMA_PERSIST_DIRECTORY = os.path.join(

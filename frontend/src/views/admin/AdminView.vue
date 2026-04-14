@@ -16,60 +16,32 @@
             <el-icon><User /></el-icon>
             <span>用户管理</span>
           </div>
-          <div
-            class="sidebar-item"
-            :class="{ active: activeTab === 'history' }"
-            @click="activeTab = 'history'"
-          >
-            <el-icon><Document /></el-icon>
-            <span>用户对话记录</span>
-          </div>
+        <div
+          class="sidebar-item"
+          :class="{ active: activeTab === 'knowledge' }"
+          @click="activeTab = 'knowledge'"
+        >
+          <el-icon><FolderOpened /></el-icon>
+          <span>知识库管理</span>
+        </div>
+        <div
+          class="sidebar-item"
+          :class="{ active: activeTab === 'workspace' }"
+          @click="activeTab = 'workspace'"
+        >
+          <el-icon><Setting /></el-icon>
+          <span>工作空间</span>
+        </div>
+        <div
+          class="sidebar-item"
+          :class="{ active: activeTab === 'history' }"
+          @click="activeTab = 'history'"
+        >
+          <el-icon><Document /></el-icon>
+          <span>对话历史管理</span>
         </div>
       </div>
-
-      <template v-if="activeTab === 'history'">
-        <div class="sidebar-history-area">
-          <div class="sidebar-history-tools">
-            <div class="search-entry" @click="showHistorySearchDialog = true">
-              <el-icon><Search /></el-icon>
-              <span>{{ historySearchSummary }}</span>
-            </div>
-          </div>
-
-          <div class="sidebar-history-list">
-            <div
-              v-for="conversation in historyConversations"
-              :key="conversation.conversation_id"
-              class="history-list-item"
-              :class="{ active: selectedConversationId === conversation.conversation_id }"
-              @click="selectConversation(conversation.conversation_id)"
-            >
-              <div class="history-list-title">{{ formatConversationTitle(conversation.conversation_title) }}</div>
-              <div class="history-list-meta">
-                <span>{{ conversation.username }}</span>
-                <span>{{ conversation.message_count }} 条</span>
-              </div>
-            </div>
-
-            <div v-if="historyConversations.length === 0 && !loadingHistoryList" class="history-list-empty">
-              暂无符合条件的历史记录
-            </div>
-          </div>
-
-          <div class="sidebar-pagination">
-            <el-pagination
-              background
-              small
-              layout="prev, pager, next"
-              :total="historyPagination.total"
-              :page-size="historyPagination.per_page"
-              :current-page="historyPagination.page"
-              @current-change="loadHistory"
-            />
-          </div>
-        </div>
-      </template>
-      <div v-else class="sidebar-fill"></div>
+      </div>
 
       <div class="sidebar-footer">
         <div class="user-footer-row">
@@ -157,108 +129,190 @@
         </div>
       </section>
 
-      <section v-else class="history-layout">
-        <div class="history-main">
-          <div class="history-toolbar">
-            <div class="toolbar-meta">
-              <span v-if="selectedConversation">
-                {{ selectedConversation.username }}
-                <template v-if="showConversationTitle(selectedConversation.title)"> / {{ selectedConversation.title }}</template>
-              </span>
-              <span v-else>请选择左侧历史记录</span>
-            </div>
-            <span class="toolbar-date" v-if="selectedConversation">{{ formatDateTime(selectedConversation.updated_at) }}</span>
-          </div>
-
-          <div class="history-conversation" v-loading="loadingHistoryDetail">
-            <div v-if="historyMessages.length === 0" class="history-empty">
-              <el-empty description="请选择左侧会话查看完整记录" :image-size="100" />
-            </div>
-
-            <div v-else class="history-messages">
-              <article
-                v-for="item in historyMessages"
-                :key="item.id"
-                class="history-row"
-                :class="{ user: item.role === 'user', assistant: item.role !== 'user' }"
-              >
-                <el-avatar class="history-avatar" :size="36">
-                  {{ item.role === 'user' ? (selectedConversation?.username?.[0] || 'U') : 'AI' }}
-                </el-avatar>
-                <div class="history-bubble">
-                  <div class="message-meta">
-                    <span class="message-user">
-                      {{ item.role === 'user' ? selectedConversation?.username : 'assistant' }}
-                    </span>
-                    <span class="message-time">{{ formatDateTime(item.created_at) }}</span>
-                  </div>
-                  <AiMessage
-                    :content="item.content"
-                    :role="item.role"
-                  />
-                </div>
-              </article>
-            </div>
+      <section v-else-if="activeTab === 'knowledge'" class="admin-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">知识库管理</h2>
+            <p class="panel-subtitle">查看并编辑所有管理员创建的知识库</p>
           </div>
         </div>
+
+        <div class="panel-card">
+          <div class="users-toolbar">
+            <el-input
+              v-model="knowledgeFilters.keyword"
+              clearable
+              placeholder="按知识库名称、描述或创建者搜索"
+              class="users-search"
+              @keyup.enter="loadAdminKnowledgeBases"
+            />
+            <el-button type="primary" @click="loadAdminKnowledgeBases">查找</el-button>
+            <el-button @click="resetKnowledgeFilters">重置</el-button>
+          </div>
+
+          <el-table :data="adminKnowledgeBases" v-loading="loadingKnowledgeBases" stripe class="custom-table">
+            <el-table-column prop="name" label="知识库名称" min-width="160" />
+            <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="owner_username" label="创建管理员" min-width="120" />
+            <el-table-column label="文件数" width="90" align="center">
+              <template #default="{ row }">{{ row.file_count || 0 }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.is_system ? 'success' : 'info'">
+                  {{ row.is_system ? '公共' : '私人' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="更新时间" min-width="160">
+              <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="openKnowledgeDialog(row)">
+                  编辑
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </section>
+
+      <section v-else-if="activeTab === 'workspace'" class="admin-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">工作空间</h2>
+            <p class="panel-subtitle">查看并编辑所有管理员创建的大模型</p>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="users-toolbar">
+            <el-input
+              v-model="workspaceFilters.keyword"
+              clearable
+              placeholder="按模型名称、模型标识或创建者搜索"
+              class="users-search"
+              @keyup.enter="loadAdminWorkspaceModels"
+            />
+            <el-button type="primary" @click="loadAdminWorkspaceModels">查找</el-button>
+            <el-button @click="resetWorkspaceFilters">重置</el-button>
+          </div>
+
+          <el-table :data="adminWorkspaceModels" v-loading="loadingWorkspaceModels" stripe class="custom-table">
+            <el-table-column prop="name" label="模型名称" min-width="150" />
+            <el-table-column label="类型" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.type === 'external' ? 'warning' : 'primary'">
+                  {{ row.type === 'external' ? '云端' : '本地' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="模型标识" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.type === 'external' ? row.model_name : row.base_model }}</template>
+            </el-table-column>
+            <el-table-column prop="owner_username" label="创建管理员" min-width="120" />
+            <el-table-column label="知识库" width="90" align="center">
+              <template #default="{ row }">{{ row.knowledge_bases?.length || 0 }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.is_system ? 'success' : 'info'">
+                  {{ row.is_system ? '公共' : '私人' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="更新时间" min-width="160">
+              <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="openWorkspaceDialog(row)">
+                  编辑
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+      </section>
+
+      <section v-else-if="activeTab === 'history'" class="history-layout">
+        <ConversationHistoryManager />
       </section>
     </main>
 
-    <el-dialog
-      v-model="showHistorySearchDialog"
-      width="520px"
-      destroy-on-close
-      class="custom-dialog search-dialog"
-    >
-      <button class="dialog-close-btn" @click="showHistorySearchDialog = false">
+    <el-dialog v-model="showKnowledgeDialog" width="520px" destroy-on-close class="custom-dialog search-dialog">
+      <button class="dialog-close-btn" @click="showKnowledgeDialog = false">
         <el-icon><Close /></el-icon>
       </button>
       <div class="dialog-header-icon">
         <div class="icon-wrapper">
-          <el-icon :size="28"><Search /></el-icon>
+          <el-icon :size="28"><FolderOpened /></el-icon>
         </div>
-        <h3 class="dialog-title">检索用户对话记录</h3>
+        <h3 class="dialog-title">编辑知识库</h3>
       </div>
       <div class="search-dialog-body">
-        <el-form label-position="top" class="history-form">
-          <el-form-item label="关键词">
-            <el-input v-model="historyFilters.keyword" clearable placeholder="消息内容或标题" />
+        <el-form :model="knowledgeForm" label-position="top" class="history-form">
+          <el-form-item label="知识库名称">
+            <el-input v-model="knowledgeForm.name" />
           </el-form-item>
-          <el-form-item label="用户名">
-            <el-input v-model="historyFilters.username" clearable placeholder="按用户名筛选" />
+          <el-form-item label="描述">
+            <el-input v-model="knowledgeForm.description" type="textarea" :rows="4" />
           </el-form-item>
-          <el-form-item label="开始日期">
-            <el-date-picker
-              v-model="historyFilters.start_date"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="开始日期"
-              style="width: 100%"
-            />
-          </el-form-item>
-          <el-form-item label="结束日期">
-            <el-date-picker
-              v-model="historyFilters.end_date"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="结束日期"
-              style="width: 100%"
-            />
-          </el-form-item>
-          <el-form-item label="每页条数">
-            <el-select v-model="historyFilters.per_page" style="width: 100%">
-              <el-option :value="10" label="10" />
-              <el-option :value="20" label="20" />
-              <el-option :value="50" label="50" />
-              <el-option :value="100" label="100" />
-            </el-select>
+          <el-form-item label="公共知识库">
+            <el-switch v-model="knowledgeForm.is_system" />
           </el-form-item>
         </el-form>
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="resetHistoryFilters">重置</el-button>
-          <el-button type="primary" @click="applyHistorySearch">检索</el-button>
+          <el-button @click="showKnowledgeDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveKnowledgeBase">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showWorkspaceDialog" width="560px" destroy-on-close class="custom-dialog search-dialog">
+      <button class="dialog-close-btn" @click="showWorkspaceDialog = false">
+        <el-icon><Close /></el-icon>
+      </button>
+      <div class="dialog-header-icon">
+        <div class="icon-wrapper">
+          <el-icon :size="28"><Setting /></el-icon>
+        </div>
+        <h3 class="dialog-title">编辑模型</h3>
+      </div>
+      <div class="search-dialog-body">
+        <el-form :model="workspaceForm" label-position="top" class="history-form">
+          <el-form-item label="模型名称">
+            <el-input v-model="workspaceForm.name" />
+          </el-form-item>
+          <el-form-item :label="workspaceForm.type === 'external' ? '云端模型名称' : '本地模型名称'">
+            <el-input v-if="workspaceForm.type === 'external'" v-model="workspaceForm.model_name" />
+            <el-input v-else v-model="workspaceForm.base_model" />
+          </el-form-item>
+          <el-form-item v-if="workspaceForm.type === 'external'" label="API 基地址">
+            <el-input v-model="workspaceForm.api_base_url" />
+          </el-form-item>
+          <el-form-item v-if="workspaceForm.type === 'external'" label="API 密钥">
+            <el-input v-model="workspaceForm.api_key" type="password" show-password placeholder="留空则保留原密钥" />
+          </el-form-item>
+          <el-form-item label="系统提示词">
+            <el-input v-model="workspaceForm.system_prompt" type="textarea" :rows="4" />
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input v-model="workspaceForm.description" type="textarea" :rows="3" />
+          </el-form-item>
+          <el-form-item label="公共模型">
+            <el-switch v-model="workspaceForm.is_system" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showWorkspaceDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveWorkspaceModel">保存</el-button>
         </div>
       </template>
     </el-dialog>
@@ -269,10 +323,10 @@
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Search, User, Close, Document } from '@element-plus/icons-vue'
+import { User, Close, Document, FolderOpened, Setting } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as adminApi from '@/api/admin'
-import { AiMessage } from '@/components/ai'
+import ConversationHistoryManager from '@/components/history/ConversationHistoryManager.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -287,35 +341,35 @@ const userPagination = reactive({
   page: 1,
   per_page: 20
 })
-const historyConversations = ref([])
-const historyMessages = ref([])
-const selectedConversationId = ref(null)
-const selectedConversation = ref(null)
-const loadingHistoryList = ref(false)
-const loadingHistoryDetail = ref(false)
-const showHistorySearchDialog = ref(false)
-const historyPagination = reactive({
-  total: 0,
-  page: 1,
-  per_page: 20
+const adminKnowledgeBases = ref([])
+const loadingKnowledgeBases = ref(false)
+const knowledgeFilters = reactive({ keyword: '' })
+const showKnowledgeDialog = ref(false)
+const editingKnowledge = ref(null)
+const knowledgeForm = reactive({
+  id: '',
+  name: '',
+  description: '',
+  is_system: false
 })
-const historyFilters = reactive({
-  keyword: '',
-  username: '',
-  start_date: '',
-  end_date: '',
-  per_page: 20
+const adminWorkspaceModels = ref([])
+const loadingWorkspaceModels = ref(false)
+const workspaceFilters = reactive({ keyword: '' })
+const showWorkspaceDialog = ref(false)
+const editingWorkspace = ref(null)
+const workspaceForm = reactive({
+  id: '',
+  type: 'local',
+  name: '',
+  base_model: '',
+  model_name: '',
+  api_base_url: '',
+  api_key: '',
+  system_prompt: '',
+  description: '',
+  is_system: false
 })
 const user = computed(() => authStore.user)
-const historySearchSummary = computed(() => {
-  const parts = []
-  if (historyFilters.keyword) parts.push(`关键词：${historyFilters.keyword}`)
-  if (historyFilters.username) parts.push(`用户：${historyFilters.username}`)
-  if (historyFilters.start_date) parts.push(`开始：${historyFilters.start_date}`)
-  if (historyFilters.end_date) parts.push(`结束：${historyFilters.end_date}`)
-  parts.push(`每页：${historyFilters.per_page}`)
-  return parts.length ? parts.join('  ·  ') : '点击检索用户对话记录'
-})
 
 async function loadUsers(page = userPagination.page) {
   loadingUsers.value = true
@@ -378,66 +432,104 @@ async function removeUser(user) {
   } catch {}
 }
 
-async function loadHistory(page = historyPagination.page) {
-  loadingHistoryList.value = true
+async function loadAdminKnowledgeBases() {
+  loadingKnowledgeBases.value = true
   try {
-    const res = await adminApi.searchHistoryConversations({
-      ...historyFilters,
-      page,
-      per_page: historyFilters.per_page
+    const res = await adminApi.getAdminKnowledgeBases({
+      keyword: knowledgeFilters.keyword
     })
-    historyConversations.value = res.data?.items || []
-    historyPagination.total = res.data?.pagination?.total || 0
-    historyPagination.page = res.data?.pagination?.page || page
-    historyPagination.per_page = res.data?.pagination?.per_page || historyFilters.per_page
-    if (historyConversations.value.length > 0) {
-      const nextId = historyConversations.value.some(item => item.conversation_id === selectedConversationId.value)
-        ? selectedConversationId.value
-        : historyConversations.value[0].conversation_id
-      await selectConversation(nextId)
-    } else {
-      selectedConversationId.value = null
-      selectedConversation.value = null
-      historyMessages.value = []
-    }
+    adminKnowledgeBases.value = res.data || []
   } finally {
-    loadingHistoryList.value = false
+    loadingKnowledgeBases.value = false
   }
 }
 
-async function selectConversation(conversationId) {
-  if (!conversationId) return
-  selectedConversationId.value = conversationId
-  loadingHistoryDetail.value = true
+function resetKnowledgeFilters() {
+  knowledgeFilters.keyword = ''
+  loadAdminKnowledgeBases()
+}
+
+function openKnowledgeDialog(item) {
+  editingKnowledge.value = item
+  Object.assign(knowledgeForm, {
+    id: item.id,
+    name: item.name || '',
+    description: item.description || '',
+    is_system: !!item.is_system
+  })
+  showKnowledgeDialog.value = true
+}
+
+async function saveKnowledgeBase() {
+  if (!editingKnowledge.value) return
   try {
-    const res = await adminApi.getHistoryConversationDetail(conversationId)
-    selectedConversation.value = res.data?.conversation || null
-    historyMessages.value = res.data?.messages || []
+    await adminApi.updateAdminKnowledgeBase(editingKnowledge.value.id, {
+      name: knowledgeForm.name,
+      description: knowledgeForm.description,
+      is_system: knowledgeForm.is_system
+    })
+    ElMessage.success('知识库已更新')
+    showKnowledgeDialog.value = false
+    loadAdminKnowledgeBases()
+  } catch {}
+}
+
+async function loadAdminWorkspaceModels() {
+  loadingWorkspaceModels.value = true
+  try {
+    const res = await adminApi.getAdminWorkspaceModels({
+      keyword: workspaceFilters.keyword
+    })
+    adminWorkspaceModels.value = res.data || []
   } finally {
-    loadingHistoryDetail.value = false
+    loadingWorkspaceModels.value = false
   }
 }
 
-function applyHistorySearch() {
-  showHistorySearchDialog.value = false
-  loadHistory(1)
+function resetWorkspaceFilters() {
+  workspaceFilters.keyword = ''
+  loadAdminWorkspaceModels()
 }
 
-function resetHistoryFilters() {
-  historyFilters.keyword = ''
-  historyFilters.username = ''
-  historyFilters.start_date = ''
-  historyFilters.end_date = ''
-  historyFilters.per_page = 20
+function openWorkspaceDialog(item) {
+  editingWorkspace.value = item
+  Object.assign(workspaceForm, {
+    id: item.id,
+    type: item.type || 'local',
+    name: item.name || '',
+    base_model: item.base_model || '',
+    model_name: item.model_name || '',
+    api_base_url: item.api_base_url || '',
+    api_key: '',
+    system_prompt: item.system_prompt || '',
+    description: item.description || '',
+    is_system: !!item.is_system
+  })
+  showWorkspaceDialog.value = true
 }
 
-function showConversationTitle(title) {
-  return !!title && title !== 'New Conversation'
-}
-
-function formatConversationTitle(title) {
-  if (showConversationTitle(title)) return title
-  return '新对话'
+async function saveWorkspaceModel() {
+  if (!editingWorkspace.value) return
+  const payload = {
+    name: workspaceForm.name,
+    system_prompt: workspaceForm.system_prompt,
+    description: workspaceForm.description,
+    is_system: workspaceForm.is_system
+  }
+  try {
+    if (workspaceForm.type === 'external') {
+      payload.model_name = workspaceForm.model_name
+      payload.api_base_url = workspaceForm.api_base_url
+      if (workspaceForm.api_key) payload.api_key = workspaceForm.api_key
+      await adminApi.updateAdminExternalModel(editingWorkspace.value.id, payload)
+    } else {
+      payload.base_model = workspaceForm.base_model
+      await adminApi.updateAdminCustomModel(editingWorkspace.value.id, payload)
+    }
+    ElMessage.success('模型已更新')
+    showWorkspaceDialog.value = false
+    loadAdminWorkspaceModels()
+  } catch {}
 }
 
 function formatDateTime(value) {
@@ -447,7 +539,8 @@ function formatDateTime(value) {
 
 onMounted(() => {
   loadUsers()
-  loadHistory(1)
+  loadAdminKnowledgeBases()
+  loadAdminWorkspaceModels()
 })
 </script>
 
@@ -460,15 +553,15 @@ onMounted(() => {
 }
 
 .admin-sidebar {
-  width: 260px;
+  width: 300px;
   height: 100vh;
   background: rgba(255, 255, 255, 0.9);
   border-right: 1px solid rgba(99, 102, 241, 0.12);
-  padding: 28px 18px;
+  padding: 20px 16px;
   box-shadow: 12px 0 30px rgba(99, 102, 241, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -496,32 +589,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.sidebar-history-tools {
-  flex-shrink: 0;
-}
-
-.sidebar-history-area {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.sidebar-fill {
-  flex: 1;
-  min-height: 0;
-}
-
-.sidebar-history-list {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
 }
 
 .sidebar-footer {
@@ -640,101 +707,17 @@ onMounted(() => {
 .history-layout {
   height: 100%;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-layout :deep(.page-container) {
+  padding: 0;
+  min-height: 0;
 }
 
 .history-form {
   margin-top: 16px;
-}
-
-.history-list-item {
-  padding: 12px 14px;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-
-  &:hover {
-    background: rgba(99, 102, 241, 0.08);
-  }
-
-  &.active {
-    background: rgba(99, 102, 241, 0.12);
-    border-color: rgba(99, 102, 241, 0.16);
-  }
-}
-
-.history-list-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1E1B4B;
-  margin-bottom: 6px;
-}
-
-.history-list-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  color: #7C7AA3;
-}
-
-.history-list-empty {
-  padding: 18px 6px;
-  color: #8C8AB0;
-  font-size: 13px;
-}
-
-.sidebar-pagination {
-  flex-shrink: 0;
-}
-
-.search-entry {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  color: #1E1B4B;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15) inset;
-  transition: all 0.25s ease;
-
-  &:hover {
-    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3) inset;
-  }
-
-  .el-icon {
-    color: #A5A3C9;
-  }
-}
-
-.history-main {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.history-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 20px;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
-}
-
-.toolbar-meta {
-  color: #6B688F;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.toolbar-date {
-  color: #8C8AB0;
-  font-size: 13px;
 }
 
 .switch-side-btn {
@@ -748,80 +731,6 @@ onMounted(() => {
     background: rgba(99, 102, 241, 0.08);
     color: #4F46E5;
   }
-}
-
-.history-conversation {
-  flex: 1;
-  overflow: auto;
-  padding: 24px;
-}
-
-.history-empty {
-  min-height: 100%;
-  display: grid;
-  place-items: center;
-}
-
-.history-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.history-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  max-width: min(900px, 92%);
-
-  &.user {
-    align-self: flex-end;
-    flex-direction: row-reverse;
-  }
-
-  &.assistant {
-    align-self: flex-start;
-  }
-}
-
-.history-avatar {
-  flex-shrink: 0;
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
-  color: #fff;
-}
-
-.history-bubble {
-  flex: 1;
-  padding: 18px 20px;
-  border-radius: 20px;
-  background: #FFFFFF;
-  border: 1px solid rgba(99, 102, 241, 0.1);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.08);
-}
-
-.history-row.user .history-bubble {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.1));
-}
-
-.message-meta {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: #7C7AA3;
-  margin-bottom: 8px;
-}
-
-.message-user {
-  font-weight: 700;
-  color: #4F46E5;
-}
-
-:deep(.history-bubble .ai-message) {
-  padding: 0;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
 }
 
 :deep(.search-dialog .el-dialog__header) {
@@ -909,13 +818,4 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 1100px) {
-  .history-row {
-    max-width: 100%;
-  }
-
-  .history-message {
-    max-width: 100%;
-  }
-}
 </style>

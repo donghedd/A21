@@ -4,13 +4,14 @@ File Processing Service
 import os
 import uuid
 import hashlib
+import shutil
 from typing import Optional
 from flask import current_app
 from werkzeug.utils import secure_filename
 import logging
 
 from ..extensions import db
-from ..models import File, KnowledgeBase
+from ..models import File, KnowledgeBase, User
 from .rag_service import get_rag_service
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,9 @@ class FileService:
         kb = KnowledgeBase.query.get(knowledge_base_id)
         if not kb:
             raise ValueError("Knowledge base not found")
+        user = User.query.get(user_id)
+        if not kb.can_edit(user):
+            raise ValueError("Permission denied")
         
         # Secure filename and generate unique name
         original_filename = secure_filename(file.filename)
@@ -77,6 +81,59 @@ class FileService:
         
         logger.info(f"Saved file: {original_filename} -> {filepath}")
         
+        return file_record
+
+    @staticmethod
+    def import_local_file(source_path: str, knowledge_base_id: str, user_id: str) -> Optional[File]:
+        """Copy a local file into uploads and create a file record for indexing."""
+        if not source_path or not os.path.exists(source_path):
+            raise ValueError("Source file not found")
+
+        filename = os.path.basename(source_path)
+        if not FileService.allowed_file(filename):
+            raise ValueError(
+                f"File type not allowed. Allowed: {', '.join(sorted(current_app.config['ALLOWED_EXTENSIONS']))}"
+            )
+
+        kb = KnowledgeBase.query.get(knowledge_base_id)
+        if not kb:
+            raise ValueError("Knowledge base not found")
+
+        user = User.query.get(user_id)
+        if not kb.can_edit(user):
+            raise ValueError("Permission denied")
+
+        existing = File.query.filter_by(
+            knowledge_base_id=knowledge_base_id,
+            filename=filename
+        ).first()
+        if existing:
+            return existing
+
+        file_ext = filename.rsplit('.', 1)[1].lower()
+        unique_filename = f"{uuid.uuid4()}.{file_ext}"
+
+        upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], knowledge_base_id)
+        os.makedirs(upload_dir, exist_ok=True)
+
+        filepath = os.path.join(upload_dir, unique_filename)
+        shutil.copy2(source_path, filepath)
+        file_size = os.path.getsize(filepath)
+
+        file_record = File(
+            id=str(uuid.uuid4()),
+            knowledge_base_id=knowledge_base_id,
+            user_id=user_id,
+            filename=filename,
+            filepath=filepath,
+            file_type=file_ext,
+            file_size=file_size,
+            status='pending'
+        )
+
+        db.session.add(file_record)
+        db.session.commit()
+        logger.info(f"Imported local file: {filename} -> {filepath}")
         return file_record
     
     @staticmethod
@@ -144,7 +201,9 @@ class FileService:
             raise ValueError("File not found")
         
         if file_record.user_id != user_id:
-            raise ValueError("Permission denied")
+            user = User.query.get(user_id)
+            if not user or user.role != 'admin':
+                raise ValueError("Permission denied")
         
         try:
             # Get knowledge base
