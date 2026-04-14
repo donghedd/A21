@@ -45,6 +45,45 @@
               <span>对话历史管理</span>
             </div>
           </div>
+
+          <!-- 会话列表 -->
+          <div class="conversation-list">
+            <div class="list-header">
+              <span class="list-title">对话历史</span>
+            </div>
+
+            <div v-if="conversations.length > 0" class="conv-items">
+              <el-dropdown
+                v-for="conv in conversations"
+                :key="conv.id"
+                :visible="openConversationMenuId === conv.id"
+                trigger="contextmenu"
+                placement="right-start"
+                @visible-change="(visible) => onConversationMenuVisibleChange(conv.id, visible)"
+                @command="(cmd) => onConversationCommand(cmd, conv)"
+              >
+                <div
+                  class="conv-item"
+                  @click="selectConversation(conv.id)"
+                >
+                  <el-icon class="conv-icon"><ChatDotRound /></el-icon>
+                  <span class="conv-title">{{ conv.title || '新对话' }}</span>
+                </div>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="rename">
+                      <el-icon><Edit /></el-icon>修改
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided class="delete-item">
+                      <el-icon><Delete /></el-icon>删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+
+            <el-empty v-if="conversations.length === 0" description="暂无对话" :image-size="60" />
+          </div>
         </div>
       </div>
 
@@ -326,14 +365,16 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { User, Close, Document, FolderOpened, Setting } from '@element-plus/icons-vue'
+import { useAuthStore, useConversationStore } from '@/stores'
+import { User, Close, Document, FolderOpened, Setting, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as adminApi from '@/api/admin'
+import * as chatApi from '@/api/chat'
 import ConversationHistoryManager from '@/components/history/ConversationHistoryManager.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const conversationStore = useConversationStore()
 const activeTab = ref('users')
 const users = ref([])
 const loadingUsers = ref(false)
@@ -374,6 +415,13 @@ const workspaceForm = reactive({
   is_system: false
 })
 const user = computed(() => authStore.user)
+
+// 历史对话相关状态
+const conversations = computed({
+  get: () => conversationStore.conversations,
+  set: (val) => conversationStore.setConversations(val)
+})
+const openConversationMenuId = ref(null)
 
 async function loadUsers(page = userPagination.page) {
   loadingUsers.value = true
@@ -541,10 +589,89 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('zh-CN')
 }
 
+// 历史对话相关方法
+async function loadConversations() {
+  try {
+    const res = await chatApi.getConversations({ per_page: 50 })
+    conversationStore.setConversations(res.data?.conversations || [])
+  } catch (error) {
+    console.error('Failed to load conversations:', error)
+    ElMessage.error('加载对话列表失败')
+  }
+}
+
+function closeConversationMenu() {
+  openConversationMenuId.value = null
+}
+
+function onConversationMenuVisibleChange(conversationId, visible) {
+  if (visible) {
+    openConversationMenuId.value = conversationId
+    return
+  }
+
+  if (openConversationMenuId.value === conversationId) {
+    openConversationMenuId.value = null
+  }
+}
+
+async function selectConversation(id) {
+  // 切换到用户端并选择对话
+  conversationStore.setCurrentConversation(id)
+  await router.push({ name: 'ChatHome' })
+}
+
+async function deleteConversation(id) {
+  try {
+    await ElMessageBox.confirm('确定要删除该对话吗？', '提示', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await chatApi.deleteConversation(id)
+    const updatedConversations = conversations.value.filter(c => c.id !== id)
+    conversationStore.setConversations(updatedConversations)
+    conversationStore.clearConversation(id)
+    ElMessage.success('对话已删除')
+  } catch {}
+}
+
+async function handleRename(conversation) {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新标题', '重命名对话', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputValue: conversation.title || '新对话'
+    })
+
+    if (value && value.trim()) {
+      await chatApi.updateConversation(conversation.id, { title: value.trim() })
+      const conv = conversations.value.find(c => c.id === conversation.id)
+      if (conv) conv.title = value.trim()
+      ElMessage.success('重命名成功')
+    }
+  } catch {
+    // 用户取消
+  }
+}
+
+function onConversationCommand(command, conversation) {
+  closeConversationMenu()
+  if (command === 'rename') {
+    handleRename(conversation)
+    return
+  }
+
+  if (command === 'delete') {
+    deleteConversation(conversation.id)
+  }
+}
+
 onMounted(() => {
   loadUsers()
   loadAdminKnowledgeBases()
   loadAdminWorkspaceModels()
+  loadConversations()
 })
 </script>
 
@@ -619,6 +746,81 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin-bottom: 16px;
+}
+
+.conv-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+
+  &:hover {
+    background: rgba(99, 102, 241, 0.07);
+  }
+
+  &.active {
+    background: rgba(99, 102, 241, 0.12);
+
+    .conv-title {
+      color: #4F46E5;
+      font-weight: 600;
+    }
+
+    .conv-icon {
+      color: #6366F1;
+    }
+  }
+
+  .conv-icon {
+    color: #A5A3C9;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: color 0.2s;
+  }
+
+  .conv-title {
+    flex: 1;
+    font-size: 13.5px;
+    color: #4B5563;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+}
+
+.conversation-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+
+  :deep(.el-dropdown) {
+    display: block;
+  }
+
+  .list-header {
+    padding: 10px 14px;
+    margin-bottom: 6px;
+
+    .list-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #A5A3C9;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  }
 }
 
 .sidebar-footer {
