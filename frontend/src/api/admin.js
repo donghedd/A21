@@ -24,6 +24,10 @@ export function getHistoryConversationDetail(conversationId) {
   return request.get(`/admin/history/conversations/${conversationId}`)
 }
 
+export function deleteHistoryConversation(conversationId) {
+  return request.delete(`/admin/history/conversations/${conversationId}`)
+}
+
 export function getAdminKnowledgeBases(params = {}) {
   return request.get('/admin/knowledge-bases', { params })
 }

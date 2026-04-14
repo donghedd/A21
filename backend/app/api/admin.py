@@ -257,6 +257,23 @@ def get_history_conversation_detail(conversation_id):
     })
 
 
+@admin_bp.route('/history/conversations/<conversation_id>', methods=['DELETE'])
+@admin_required
+def delete_history_conversation(conversation_id):
+    """Delete a conversation from admin history view."""
+    conversation = Conversation.query.get(conversation_id)
+    if not conversation:
+        return error_response(404, 'Conversation not found')
+
+    try:
+        db.session.delete(conversation)
+        db.session.commit()
+        return success_response(message='Conversation deleted')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(400, str(e))
+
+
 @admin_bp.route('/knowledge-bases', methods=['GET'])
 @admin_required
 def get_admin_knowledge_bases():
