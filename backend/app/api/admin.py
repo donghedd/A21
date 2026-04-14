@@ -172,7 +172,7 @@ def search_history_conversations():
         func.count(Message.id).label('message_count')
     ).join(
         User, Conversation.user_id == User.id
-    ).join(
+    ).outerjoin(
         Message, Message.conversation_id == Conversation.id
     )
 
@@ -199,7 +199,11 @@ def search_history_conversations():
         Conversation.updated_at
     )
 
-    pagination = query.order_by(Conversation.updated_at.desc()).paginate(
+    pagination = query.order_by(
+        Conversation.updated_at.desc(),
+        Conversation.created_at.desc(),
+        Conversation.id.desc()
+    ).paginate(
         page=page,
         per_page=per_page,
         error_out=False

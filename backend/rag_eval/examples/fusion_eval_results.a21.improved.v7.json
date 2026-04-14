@@ -1,0 +1,1304 @@
+{
+  "generated_at": "2026-04-14T08:34:50.681197Z",
+  "dataset": {
+    "name": "A21 KG+文档真实评测集",
+    "description": "对齐当前真实入库文档与 Neo4j 图谱的最小可运行融合评测集",
+    "query_count": 3,
+    "k_values": [
+      1,
+      3,
+      5,
+      10
+    ]
+  },
+  "retrieval_settings": {
+    "collection_names": [
+      "kb_3ae7907f1ec5"
+    ],
+    "enable_rerank": true,
+    "enable_hybrid": null,
+    "enable_multi_source": null,
+    "relevance_threshold": 0.0,
+    "enable_kg": true,
+    "document_limit": null,
+    "kg_limit": null
+  },
+  "summary": {
+    "dataset_name": "A21 KG+文档真实评测集",
+    "dataset_description": "对齐当前真实入库文档与 Neo4j 图谱的最小可运行融合评测集",
+    "total_queries": 3,
+    "skipped_queries_without_any_labels": 0,
+    "collection_count": 1,
+    "collection_names": [
+      "kb_3ae7907f1ec5"
+    ],
+    "k_values": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "levels": {
+      "file": {
+        "queries_with_labels": 3,
+        "queries_without_labels": 0,
+        "averages": {
+          "1": {
+            "recall": 0.0,
+            "hit_rate": 0.0,
+            "mrr": 0.0
+          },
+          "3": {
+            "recall": 0.333333,
+            "hit_rate": 0.333333,
+            "mrr": 0.166667
+          },
+          "5": {
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "mrr": 0.333333
+          },
+          "10": {
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "mrr": 0.333333
+          }
+        }
+      },
+      "chunk": {
+        "queries_with_labels": 3,
+        "queries_without_labels": 0,
+        "averages": {
+          "1": {
+            "recall": 0.0,
+            "hit_rate": 0.0,
+            "mrr": 0.0
+          },
+          "3": {
+            "recall": 0.0,
+            "hit_rate": 0.0,
+            "mrr": 0.0
+          },
+          "5": {
+            "recall": 0.166667,
+            "hit_rate": 0.333333,
+            "mrr": 0.083333
+          },
+          "10": {
+            "recall": 0.166667,
+            "hit_rate": 0.333333,
+            "mrr": 0.083333
+          }
+        }
+      },
+      "kg_node": {
+        "queries_with_labels": 3,
+        "queries_without_labels": 0,
+        "averages": {
+          "1": {
+            "recall": 0.833333,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          },
+          "3": {
+            "recall": 0.833333,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          },
+          "5": {
+            "recall": 0.833333,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          },
+          "10": {
+            "recall": 0.833333,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          }
+        }
+      },
+      "fusion": {
+        "queries_with_labels": 3,
+        "queries_without_labels": 0,
+        "averages": {
+          "1": {
+            "recall": 0.344444,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          },
+          "3": {
+            "recall": 0.344444,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          },
+          "5": {
+            "recall": 0.455556,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          },
+          "10": {
+            "recall": 0.455556,
+            "hit_rate": 1.0,
+            "mrr": 1.0
+          }
+        }
+      }
+    },
+    "settings": {
+      "enable_rerank": true,
+      "enable_hybrid": null,
+      "enable_multi_source": null,
+      "relevance_threshold": 0.0,
+      "enable_kg": true,
+      "document_limit": null,
+      "kg_limit": null
+    }
+  },
+  "queries": [
+    {
+      "id": "a21_q001",
+      "query": "电机过热的原因有哪些？",
+      "notes": "对齐 ship_electrical_guide_ruan.md 中关于电动机过热故障树的内容",
+      "metadata": {
+        "label_status": "runtime",
+        "comment": "chunk 标注沿用现有本地评测集，KG 节点来自当前 Neo4j 实例"
+      },
+      "skipped": false,
+      "gold": {
+        "files": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md"
+          }
+        ],
+        "chunks": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 20
+          }
+        ],
+        "kg_nodes": [
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:137",
+            "node_name": "机过热",
+            "labels": [
+              "Fault"
+            ]
+          }
+        ],
+        "fusion": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 20,
+            "target_type": "chunk"
+          },
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:137",
+            "node_name": "机过热",
+            "labels": [
+              "Fault"
+            ],
+            "target_type": "kg_node"
+          }
+        ]
+      },
+      "retrieved_results": [
+        {
+          "rank": 1,
+          "source_type": "kg",
+          "file_id": "kg:4:8857b177-fef7-402d-8ce0-510025ebf11b:137",
+          "file_name": "知识图谱: 机过热",
+          "chunk_index": null,
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:137",
+          "node_name": "机过热",
+          "node_labels": [
+            "Fault"
+          ],
+          "section_title": "机过热",
+          "section_path": [
+            "知识图谱",
+            "Fault"
+          ],
+          "score": 0.99,
+          "distance": 0.0,
+          "preview": "图谱节点: 机过热 节点类型: Fault 命中关键词: 电动机过热, 电机, 过热 节点属性: - aliases: 会使发电机过热, 会使电动机过热而损坏, 右压缩机过热, 固定好发电机过热 - mentions: 9 - name: 机过热 - merged_count: 9 关联关系: - 船舶电气设备维修指南 来源书籍 机过热 - 内河船舶电..."
+        },
+        {
+          "rank": 2,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 14,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "五、故障树的诊断方法",
+          "section_path": "五、故障树的诊断方法",
+          "score": 0.812439,
+          "distance": 1.0,
+          "preview": "# 五、故障树的诊断方法"
+        },
+        {
+          "rank": 3,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 15,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "1. 首先建立故障树",
+          "section_path": "1. 首先建立故障树",
+          "score": 0.785692,
+          "distance": 1.0,
+          "preview": "# 1. 首先建立故障树 建立故障树可以与设备设计、可靠性分析一起完成，有了故障树既可以进行设备可靠性分析，同时也为设备管理维修提供了一个分析故障的逻辑思维。必须指出：一个设备有可能出现多少故障，就有多少个与此对应的故障树，应一一建立。"
+        },
+        {
+          "rank": 4,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 585,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "1）电动机过热，甚至绕组烧毁",
+          "section_path": "1）电动机过热，甚至绕组烧毁",
+          "score": 0.773987,
+          "distance": 1.0,
+          "preview": "# 1）电动机过热，甚至绕组烧毁 产生这种故障的原因主要有："
+        },
+        {
+          "rank": 5,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 22,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "五、故障树诊断方法",
+          "section_path": "五、故障树诊断方法",
+          "score": 0.770306,
+          "distance": 1.0,
+          "preview": "# 五、故障树诊断方法"
+        },
+        {
+          "rank": 6,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 401,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "4. 电动机运行时噪声大",
+          "section_path": "4. 电动机运行时噪声大",
+          "score": 0.769344,
+          "distance": 1.0,
+          "preview": "# 4. 电动机运行时噪声大 我们从电磁噪声和机械噪声两个方面来分析。电磁噪声是电机中的电磁不对称引起的；而机械噪声是由电动机机械部分引起的。这样进一步分析，就可得如图5-5的故障树，造成 图5-4 电机温升高的故障树 图5-5 电机噪声大的故障树 该故障的原因就有16个。检查步骤如下： 首先判别该噪声是电磁噪声，还是机械噪声，或者两者都存在，判别的方..."
+        },
+        {
+          "rank": 7,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 21,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "例二 单速不可逆交流电动拖动系统",
+          "section_path": "例二 单速不可逆交流电动拖动系统",
+          "score": 0.765886,
+          "distance": 1.0,
+          "preview": "# 例二 单速不可逆交流电动拖动系统 单速不可逆交流电动拖动系统如图1-4所示，以电动机不能起动为顶端事件做出它的故障树。 解：造成这种故障的直接原因有：（1）电动机本身故障。（2）电动机无电。（3）机械卡 死。造成电动机无电的原因有：①线路停电；②K无法合上；③KM没有合上。而造成KM没有合上的原因有：①KM衔铁卡死无法合上；②KM线圈故障；③KM无..."
+        },
+        {
+          "rank": 8,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 23,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "1. 首先要建立故障树",
+          "section_path": "1. 首先要建立故障树",
+          "score": 0.759702,
+          "distance": 1.0,
+          "preview": "# 1. 首先要建立故障树 建造故障树可以与设备设计、可靠性分析时一起完成，有了故障树既可以进行设备可靠性分析，同时为我们管理维修提供了一个分析故障的逻辑思维。必须指出：一个设备有可能出现多少故障，就有多少个与此对应的故障树，应一一建造。"
+        },
+        {
+          "rank": 9,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 575,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "1）电动机过热，甚至烧坏",
+          "section_path": "1）电动机过热，甚至烧坏",
+          "score": 0.751488,
+          "distance": 1.0,
+          "preview": "# 1）电动机过热，甚至烧坏 产生这种故障的原因主要有下列几个方面："
+        },
+        {
+          "rank": 10,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 16,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "2. 按故障树进行故障点诊断",
+          "section_path": "2. 按故障树进行故障点诊断",
+          "score": 0.744751,
+          "distance": 1.0,
+          "preview": "# 2. 按故障树进行故障点诊断 图1-5 单速不可逆交流电力拖动系统电动机不能起动故障树 一般的检查方法为：首先进行常规检查，按故障时所表现出的特征进行检查，如果没有明显特征，按常规也未能找到故障原因时可采用割枝法，即从故障树的某一级中间事件开始，看该中间事件是否发生，如果没有发生，说明与该中间事件关联的基本事件没有发生，就可以去掉这些基本事件的检查..."
+        }
+      ],
+      "evaluations": {
+        "file": {
+          "level": "file",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.25,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 4
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.25,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 4
+            }
+          }
+        },
+        "chunk": {
+          "level": "chunk",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "10": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            }
+          }
+        },
+        "kg_node": {
+          "level": "kg_node",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            }
+          }
+        },
+        "fusion": {
+          "level": "fusion",
+          "gold_count": 2,
+          "metrics": {
+            "1": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            },
+            "3": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            },
+            "5": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            },
+            "10": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a21_q002",
+      "query": "发电机电压不稳定怎么排查？",
+      "notes": "对齐发电机电压相关故障排查内容",
+      "metadata": {
+        "label_status": "runtime",
+        "comment": "KG gold 选取发电机设备与电压检查动作"
+      },
+      "skipped": false,
+      "gold": {
+        "files": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md"
+          }
+        ],
+        "chunks": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 870
+          },
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 903
+          },
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 904
+          }
+        ],
+        "kg_nodes": [
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:11",
+            "node_name": "发电机",
+            "labels": [
+              "Device"
+            ]
+          },
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:645",
+            "node_name": "检查电压",
+            "labels": [
+              "Action"
+            ]
+          }
+        ],
+        "fusion": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 870,
+            "target_type": "chunk"
+          },
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 903,
+            "target_type": "chunk"
+          },
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 904,
+            "target_type": "chunk"
+          },
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:11",
+            "node_name": "发电机",
+            "labels": [
+              "Device"
+            ],
+            "target_type": "kg_node"
+          },
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:645",
+            "node_name": "检查电压",
+            "labels": [
+              "Action"
+            ],
+            "target_type": "kg_node"
+          }
+        ]
+      },
+      "retrieved_results": [
+        {
+          "rank": 1,
+          "source_type": "kg",
+          "file_id": "kg:4:8857b177-fef7-402d-8ce0-510025ebf11b:645",
+          "file_name": "知识图谱: 检查电压",
+          "chunk_index": null,
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:645",
+          "node_name": "检查电压",
+          "node_labels": [
+            "Action"
+          ],
+          "section_title": "检查电压",
+          "section_path": [
+            "知识图谱",
+            "Action"
+          ],
+          "score": 0.99,
+          "distance": 0.0,
+          "preview": "图谱节点: 检查电压 节点类型: Action 命中关键词: 检查电压 节点属性: - aliases: 检查检测回路输出电压, 检查比较回路输出电压, 检查电源电压, 检查自整角机激磁电压 - mentions: 4 - name: 检查电压 - merged_count: 4 关联关系: - 船舶电气设备维修指南 来源书籍 检查电压 - 器损坏 处..."
+        },
+        {
+          "rank": 2,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 928,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "三、同步发电机与可控相复励调压装置配合发电系统故障检修方法",
+          "section_path": "三、同步发电机与可控相复励调压装置配合发电系统故障检修方法",
+          "score": 0.843294,
+          "distance": 1.0,
+          "preview": "# 三、同步发电机与可控相复励调压装置配合发电系统故障检修方法"
+        },
+        {
+          "rank": 3,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 895,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "一、发电机与不可控相复励自励恒压装置配合的发电系统常见故障检修",
+          "section_path": "一、发电机与不可控相复励自励恒压装置配合的发电系统常见故障检修",
+          "score": 0.836691,
+          "distance": 1.0,
+          "preview": "# 一、发电机与不可控相复励自励恒压装置配合的发电系统常见故障检修 不可控相复励自励恒压装置通常有三种类型：电流叠加型、电磁叠加型、电势叠加型，目前常用的前二种类型，由于这种装置线路简单，维护工作量少，可靠性高等特点，中小型船舶仍有广泛使用。"
+        },
+        {
+          "rank": 4,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 927,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "故障检修方法：",
+          "section_path": "故障检修方法：",
+          "score": 0.782484,
+          "distance": 1.0,
+          "preview": "# 故障检修方法： 1. 发电机转速为额定转速，不能建立电压 这种故障，应检查充磁回路，即：电压继电器J的常闭触点是否闭合好，隔离二极管是否开路，充磁电池是否完好，然后，检查发电机本身激磁回路，碳刷是否接触良好，滑环是否有腐蚀、氧化物及不良导电物，激磁线圈是否开路。还有，整流桥的整流元件击穿和续流保护二极管击穿等等，也不能建立电压。 2. 发电机电压偏..."
+        },
+        {
+          "rank": 5,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 902,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "（三）同步发电机与不可控相复励调压器配合发电系统常见故障检修",
+          "section_path": "（三）同步发电机与不可控相复励调压器配合发电系统常见故障检修",
+          "score": 0.766907,
+          "distance": 1.0,
+          "preview": "# （三）同步发电机与不可控相复励调压器配合发电系统常见故障检修 由于这种调压器元件比较少，线路简单，故障检修也比较容易。它们常见的故障和处理方法见表7-2。 发电机和不可控相复励调压器常见故障和检修方法 表7-2"
+        },
+        {
+          "rank": 6,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 894,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "第二节 船舶发电机、调压器常见故障检修",
+          "section_path": "第二节 船舶发电机、调压器常见故障检修",
+          "score": 0.744913,
+          "distance": 1.0,
+          "preview": "# 第二节 船舶发电机、调压器常见故障检修 船舶交流同步发电机都带有自动电压调节器（简称调压器）。发电机通过调压器达到起压和恒压的目的。运行时，如果供电出现异常，可能是发电机本身的故障，也可能是调压器的故障，因此我们把发电机和调压器的故障一起分析。"
+        },
+        {
+          "rank": 7,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 932,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "（二）故障检修方法",
+          "section_path": "（二）故障检修方法",
+          "score": 0.744756,
+          "distance": 1.0,
+          "preview": "# （二）故障检修方法 该系统发生故障，首先要区分故障是属于动态特性故障，如不能建立，突然不发电；还是静态特性故障，如发电机电压偏高或偏低。若属于动态特性的故障，就应检查相复励自励恒压部分；若属于静态特性故障，就应检查电压校正器。电压校正器与可控硅调压器相似，它也有测量比较电路、控制触发电路和可控硅整流主电路组成，所 以，该系统发生故障，都可参照一、二..."
+        },
+        {
+          "rank": 8,
+          "source_type": "document",
+          "file_id": "d534e121-cef2-43b2-8088-b3add2f2e093",
+          "file_name": "51-100.md",
+          "chunk_index": 75,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "二、断路器的常见故障检修",
+          "section_path": "二、断路器的常见故障检修",
+          "score": 0.74041,
+          "distance": 1.0,
+          "preview": "# 二、断路器的常见故障检修 断路器常见故障的原因分析和处理方法见表4-4。 表 4-4 断路器常见故障的原因分析和处理方法"
+        },
+        {
+          "rank": 9,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 1038,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "（一）发电机与不可控相复励调压器配合的发电系统调试",
+          "section_path": "（一）发电机与不可控相复励调压器配合的发电系统调试",
+          "score": 0.719597,
+          "distance": 1.0,
+          "preview": "# （一）发电机与不可控相复励调压器配合的发电系统调试 1. 在调试期间，为保证配电板上其它用电设备的正常供电，应把发电机控制屏的隔离排断开，与主开关联锁的电路暂时断开。 2. 为了便于调试，应在移相电抗器与发电机之间接入一只三相隔离开关和一只电压表。 3. 对照图纸核对发电机与调压器，调压器本身的接线是否正确。 4. 测量发电机、调压器的冷态绝缘电阻..."
+        },
+        {
+          "rank": 10,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 906,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "二、发电机与可控硅励磁装置配合的发电系统常见故障检修",
+          "section_path": "二、发电机与可控硅励磁装置配合的发电系统常见故障检修",
+          "score": 0.715898,
+          "distance": 1.0,
+          "preview": "# 二、发电机与可控硅励磁装置配合的发电系统常见故障检修 随着电子技术的发展和船舶用电设备对船舶电站供电品质要求越严格，为了克服不可控相复调压器控制精度不高，在70年代就引人可控硅励磁装置，它具有体积小，重量轻、能耗小等特点。"
+        }
+      ],
+      "evaluations": {
+        "file": {
+          "level": "file",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            }
+          }
+        },
+        "chunk": {
+          "level": "chunk",
+          "gold_count": 3,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            },
+            "10": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            }
+          }
+        },
+        "kg_node": {
+          "level": "kg_node",
+          "gold_count": 2,
+          "metrics": {
+            "1": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            },
+            "3": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            },
+            "5": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            },
+            "10": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 1
+            }
+          }
+        },
+        "fusion": {
+          "level": "fusion",
+          "gold_count": 5,
+          "metrics": {
+            "1": {
+              "recall": 0.2,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 5,
+              "first_relevant_rank": 1
+            },
+            "3": {
+              "recall": 0.2,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 5,
+              "first_relevant_rank": 1
+            },
+            "5": {
+              "recall": 0.2,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 5,
+              "first_relevant_rank": 1
+            },
+            "10": {
+              "recall": 0.2,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 5,
+              "first_relevant_rank": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a21_q003",
+      "query": "绝缘电阻应该怎么测量？",
+      "notes": "对齐绝缘电阻测量与兆欧表相关内容",
+      "metadata": {
+        "label_status": "runtime",
+        "comment": "KG gold 选取绝缘电阻参数节点"
+      },
+      "skipped": false,
+      "gold": {
+        "files": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md"
+          }
+        ],
+        "chunks": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 100
+          },
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 101
+          }
+        ],
+        "kg_nodes": [
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:719",
+            "node_name": "绝缘电阻",
+            "labels": [
+              "Parameter"
+            ]
+          }
+        ],
+        "fusion": [
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 100,
+            "target_type": "chunk"
+          },
+          {
+            "file_id": null,
+            "file_name": "ship_electrical_guide_ruan.md",
+            "chunk_index": 101,
+            "target_type": "chunk"
+          },
+          {
+            "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:719",
+            "node_name": "绝缘电阻",
+            "labels": [
+              "Parameter"
+            ],
+            "target_type": "kg_node"
+          }
+        ]
+      },
+      "retrieved_results": [
+        {
+          "rank": 1,
+          "source_type": "kg",
+          "file_id": "kg:4:8857b177-fef7-402d-8ce0-510025ebf11b:719",
+          "file_name": "知识图谱: 绝缘电阻",
+          "chunk_index": null,
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:719",
+          "node_name": "绝缘电阻",
+          "node_labels": [
+            "Parameter"
+          ],
+          "section_title": "绝缘电阻",
+          "section_path": [
+            "知识图谱",
+            "Parameter"
+          ],
+          "score": 0.99,
+          "distance": 0.0,
+          "preview": "图谱节点: 绝缘电阻 节点类型: Parameter 命中关键词: 绝缘电阻 节点属性: - aliases: 对地绝缘电阻, 电机绝缘电阻过低, 绝缘电阻降低 - mentions: 3 - name: 绝缘电阻 - merged_count: 3 关联关系: - 船舶电气设备维修指南 来源书籍 绝缘电阻 - 船舶电气设备及系统 来源书籍 绝缘电阻 ..."
+        },
+        {
+          "rank": 2,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 71,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "3. 测量线路间的绝缘电阻",
+          "section_path": "3. 测量线路间的绝缘电阻",
+          "score": 0.901405,
+          "distance": 1.0,
+          "preview": "# 3. 测量线路间的绝缘电阻 首先切断电源，然后将绝缘电阻表的接线柱L与E分别与被测两线路相接。测量方法同上。"
+        },
+        {
+          "rank": 3,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 60,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "一、绝缘电阻表的基本结构",
+          "section_path": "一、绝缘电阻表的基本结构",
+          "score": 0.872235,
+          "distance": 1.0,
+          "preview": "# 一、绝缘电阻表的基本结构 图2-10为绝缘电阻表的结构示意图。绝缘电阻表常采用比率表结构，其特点是用电磁力来产生反作用力矩。绝缘电阻的主要组成部分是一台手摇发电机和磁电系比率表，它以手摇发电机所能发出的最高电压进行分类，电压越高，绝缘电阻表所能测得的绝缘电阻值也就越高。兆欧表所测的绝缘电阻值以兆欧（MΩ）为单位。 绝缘电阻表上有三个接线柱，分别为接..."
+        },
+        {
+          "rank": 4,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 101,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "第三节 兆欧表",
+          "section_path": "第三节 兆欧表",
+          "score": 0.866387,
+          "distance": 1.0,
+          "preview": "用下产生两个互为相反方向上的力矩。电压线圈 YQ 产生的力矩是逆时针方向。而电流线圈 LQ 产生的力矩方向则相反，且大小与 $I_{\\mathrm{LQ}}$ 成正比。 当“ $L$ ”、“ $E$ ”两接线柱开路时， $I_{\\mathrm{LQ}} = 0$ ，只有电压线圈中有电流 $I_{\\mathrm{RQ}}$ ，指针逆时针方向偏转到最大位置..."
+        },
+        {
+          "rank": 5,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 61,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "二、绝缘电阻表的使用",
+          "section_path": "二、绝缘电阻表的使用",
+          "score": 0.852324,
+          "distance": 1.0,
+          "preview": "# 二、绝缘电阻表的使用 使用绝缘电阻表测量时，如果接线和操作不当，都将影响测量结果，甚至危及人身安全。"
+        },
+        {
+          "rank": 6,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 102,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "第三节 兆欧表",
+          "section_path": "第三节 兆欧表",
+          "score": 0.842207,
+          "distance": 1.0,
+          "preview": "(6) 对于有半导体元件的设备绝缘测量，应采取适当措施，防止它们被击穿。 （7）在兆欧表未停止摆动和被测对象未进行放电前，不可用手碰触测量线头，以防触电。 （8）兆欧表的刻度为对数分布，是不均匀的，读取数值时应注意。 （9）注意接线柱“ $G$ ”的正确使用。 兆欧表的故障分为两大类：一类是电源故障（即发电机故障），一类是测量指示表的故障。常见故障比较..."
+        },
+        {
+          "rank": 7,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 62,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "1.绝缘电阻表的选择",
+          "section_path": "1.绝缘电阻表的选择",
+          "score": 0.821927,
+          "distance": 1.0,
+          "preview": "# 1.绝缘电阻表的选择 选用绝缘电阻表进行绝缘电阻的测量时，一般应使绝缘电阻表的手摇发电机发出的最高电压高于被测对象的额定工作电压，并兼顾到不损坏被测对象，才能正确测试出被测对象在额定工作电压下工作时是否达到了必要的绝缘电阻值。 通常，当测量额定工作电压500V及500V以上（低于1000V）的低压电气设备（元器件）、电缆（电线）、电机或电力变压器的..."
+        },
+        {
+          "rank": 8,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 59,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "第三节 便携式绝缘电阻表",
+          "section_path": "第三节 便携式绝缘电阻表",
+          "score": 0.808652,
+          "distance": 1.0,
+          "preview": "# 第三节 便携式绝缘电阻表 便携式绝缘电阻表, 主要用来测量和检测电气设备、电气线路和电缆的绝缘电阻。 绝缘电阻表是电气管理人员必备的主要测量仪表之一，绝缘电阻表具有使用简便、携带方便、测量时不需要其他辅助设备、不需要外接电源即可直接读出测量结果等优点，因此被广泛使用。常用绝缘电阻表有各种不同的规格，依据其手摇发电机发出的最高电压可分为100V、20..."
+        },
+        {
+          "rank": 9,
+          "source_type": "document",
+          "file_id": "85c6149f-5e90-4b44-9fa9-3943d00c241f",
+          "file_name": "1-50.md",
+          "chunk_index": 70,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "2. 测量线路对地的绝缘电阻",
+          "section_path": "2. 测量线路对地的绝缘电阻",
+          "score": 0.807479,
+          "distance": 1.0,
+          "preview": "# 2. 测量线路对地的绝缘电阻 首先将所要测试的线路的电源切断，然后将绝缘电阻表的接线柱L接到所要测试的线路上，接线柱E接地（在船上E接船体），摇动绝缘电阻表发电机至额定转速，指针稳定后所指刻度值为该线路对地的绝缘电阻值。"
+        },
+        {
+          "rank": 10,
+          "source_type": "document",
+          "file_id": "176cdead-5eff-4c09-90ee-ad2a715cc0c1",
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 296,
+          "node_id": null,
+          "node_name": null,
+          "node_labels": [],
+          "section_title": "3. 测量各导电部件间的绝缘电阻",
+          "section_path": "3. 测量各导电部件间的绝缘电阻",
+          "score": 0.79982,
+          "distance": 1.0,
+          "preview": "# 3. 测量各导电部件间的绝缘电阻 测量绝缘电阻的部位为：触头分开时各极的动、静触头间；触头在分开与闭合时各极带电部件间；线圈引线与铁心间；各带电部件与地间等。 测量绝缘电阻常用兆欧表来测量。在测量时应根据接触器的额定电压来选用兆欧表的电压等级。"
+        }
+      ],
+      "evaluations": {
+        "file": {
+          "level": "file",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.25,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 4
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.25,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 4
+            }
+          }
+        },
+        "chunk": {
+          "level": "chunk",
+          "gold_count": 2,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 2,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 2,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 0.25,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 4
+            },
+            "10": {
+              "recall": 0.5,
+              "hit_rate": 1.0,
+              "mrr": 0.25,
+              "matched_count": 1,
+              "gold_count": 2,
+              "first_relevant_rank": 4
+            }
+          }
+        },
+        "kg_node": {
+          "level": "kg_node",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 1
+            }
+          }
+        },
+        "fusion": {
+          "level": "fusion",
+          "gold_count": 3,
+          "metrics": {
+            "1": {
+              "recall": 0.333333,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 3,
+              "first_relevant_rank": 1
+            },
+            "3": {
+              "recall": 0.333333,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 1,
+              "gold_count": 3,
+              "first_relevant_rank": 1
+            },
+            "5": {
+              "recall": 0.666667,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 2,
+              "gold_count": 3,
+              "first_relevant_rank": 1
+            },
+            "10": {
+              "recall": 0.666667,
+              "hit_rate": 1.0,
+              "mrr": 1.0,
+              "matched_count": 2,
+              "gold_count": 3,
+              "first_relevant_rank": 1
+            }
+          }
+        }
+      }
+    }
+  ],
+  "resolved_targets": {
+    "collection_names": [
+      "kb_3ae7907f1ec5"
+    ],
+    "knowledge_bases": [
+      {
+        "id": "25b31fbd-92a5-4a4b-9511-6496a12643f4",
+        "name": "A21???????",
+        "collection_name": "kb_3ae7907f1ec5",
+        "file_count": 4
+      }
+    ],
+    "custom_model": null
+  }
+}

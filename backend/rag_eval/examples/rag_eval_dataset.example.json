@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "name": "船舶电气RAG评测示例",
+    "description": "示例数据，请替换成你自己的真实标注",
+    "default_k_values": [1, 3, 5, 10]
+  },
+  "queries": [
+    {
+      "id": "q001",
+      "query": "电机过热的原因有哪些？",
+      "notes": "先做 file-level 标注示例",
+      "relevant_files": [
+        {
+          "file_name": "船舶电气设备维修指南.md"
+        }
+      ],
+      "relevant_chunks": [],
+      "metadata": {
+        "label_status": "example",
+        "comment": "这里请换成你的真实文件名或 file_id"
+      }
+    },
+    {
+      "id": "q002",
+      "query": "发电机电压不稳定怎么排查？",
+      "notes": "再做 chunk-level 标注示例",
+      "relevant_files": [],
+      "relevant_chunks": [
+        {
+          "file_name": "船舶电气设备维修指南.md",
+          "chunk_index": 7
+        },
+        {
+          "file_name": "船舶电气设备维修指南.md",
+          "chunk_index": 8
+        }
+      ],
+      "metadata": {
+        "label_status": "example",
+        "comment": "chunk_index 需要和你实际入库后的 chunk 对齐"
+      }
+    }
+  ]
+}

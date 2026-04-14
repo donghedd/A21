@@ -53,33 +53,19 @@
             </div>
 
             <div v-if="conversations.length > 0" class="conv-items">
-              <el-dropdown
+              <div
                 v-for="conv in conversations"
                 :key="conv.id"
-                :visible="openConversationMenuId === conv.id"
-                trigger="contextmenu"
-                placement="right-start"
-                @visible-change="(visible) => onConversationMenuVisibleChange(conv.id, visible)"
-                @command="(cmd) => onConversationCommand(cmd, conv)"
+                class="conv-item"
+                :class="{ active: activeTab === 'history' && selectedHistoryConversationId === conv.id }"
+                @click="selectConversation(conv.id)"
               >
-                <div
-                  class="conv-item"
-                  @click="selectConversation(conv.id)"
-                >
-                  <el-icon class="conv-icon"><ChatDotRound /></el-icon>
+                <el-icon class="conv-icon"><ChatDotRound /></el-icon>
+                <div class="conv-main">
                   <span class="conv-title">{{ conv.title || '新对话' }}</span>
+                  <span class="conv-user">{{ conv.username || '未知用户' }}</span>
                 </div>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="rename">
-                      <el-icon><Edit /></el-icon>修改
-                    </el-dropdown-item>
-                    <el-dropdown-item command="delete" divided class="delete-item">
-                      <el-icon><Delete /></el-icon>删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              </div>
             </div>
 
             <el-empty v-if="conversations.length === 0" description="暂无对话" :image-size="60" />
@@ -281,7 +267,10 @@
       </section>
 
       <section v-else-if="activeTab === 'history'" class="history-layout">
-        <ConversationHistoryManager />
+        <ConversationHistoryManager
+          admin-mode
+          :selected-conversation-id="selectedHistoryConversationId"
+        />
       </section>
     </main>
 
@@ -363,18 +352,16 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, computed } from 'vue'
+import { nextTick, onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore, useConversationStore } from '@/stores'
-import { User, Close, Document, FolderOpened, Setting, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores'
+import { User, Close, Document, FolderOpened, Setting, ChatDotRound } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as adminApi from '@/api/admin'
-import * as chatApi from '@/api/chat'
 import ConversationHistoryManager from '@/components/history/ConversationHistoryManager.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const conversationStore = useConversationStore()
 const activeTab = ref('users')
 const users = ref([])
 const loadingUsers = ref(false)
@@ -417,11 +404,8 @@ const workspaceForm = reactive({
 const user = computed(() => authStore.user)
 
 // 历史对话相关状态
-const conversations = computed({
-  get: () => conversationStore.conversations,
-  set: (val) => conversationStore.setConversations(val)
-})
-const openConversationMenuId = ref(null)
+const conversations = ref([])
+const selectedHistoryConversationId = ref('')
 
 async function loadUsers(page = userPagination.page) {
   loadingUsers.value = true
@@ -592,79 +576,24 @@ function formatDateTime(value) {
 // 历史对话相关方法
 async function loadConversations() {
   try {
-    const res = await chatApi.getConversations({ per_page: 50 })
-    conversationStore.setConversations(res.data?.conversations || [])
+    const res = await adminApi.searchHistoryConversations({ per_page: 200 })
+    conversations.value = (res.data?.items || []).map(item => ({
+      id: item.conversation_id,
+      title: item.conversation_title || '未命名对话',
+      username: item.username || '',
+      updated_at: item.updated_at
+    }))
   } catch (error) {
     console.error('Failed to load conversations:', error)
     ElMessage.error('加载对话列表失败')
   }
 }
 
-function closeConversationMenu() {
-  openConversationMenuId.value = null
-}
-
-function onConversationMenuVisibleChange(conversationId, visible) {
-  if (visible) {
-    openConversationMenuId.value = conversationId
-    return
-  }
-
-  if (openConversationMenuId.value === conversationId) {
-    openConversationMenuId.value = null
-  }
-}
-
 async function selectConversation(id) {
-  // 切换到用户端并选择对话
-  conversationStore.setCurrentConversation(id)
-  await router.push({ name: 'ChatHome' })
-}
-
-async function deleteConversation(id) {
-  try {
-    await ElMessageBox.confirm('确定要删除该对话吗？', '提示', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    await chatApi.deleteConversation(id)
-    const updatedConversations = conversations.value.filter(c => c.id !== id)
-    conversationStore.setConversations(updatedConversations)
-    conversationStore.clearConversation(id)
-    ElMessage.success('对话已删除')
-  } catch {}
-}
-
-async function handleRename(conversation) {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新标题', '重命名对话', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValue: conversation.title || '新对话'
-    })
-
-    if (value && value.trim()) {
-      await chatApi.updateConversation(conversation.id, { title: value.trim() })
-      const conv = conversations.value.find(c => c.id === conversation.id)
-      if (conv) conv.title = value.trim()
-      ElMessage.success('重命名成功')
-    }
-  } catch {
-    // 用户取消
-  }
-}
-
-function onConversationCommand(command, conversation) {
-  closeConversationMenu()
-  if (command === 'rename') {
-    handleRename(conversation)
-    return
-  }
-
-  if (command === 'delete') {
-    deleteConversation(conversation.id)
-  }
+  selectedHistoryConversationId.value = ''
+  await nextTick()
+  selectedHistoryConversationId.value = id
+  activeTab.value = 'history'
 }
 
 onMounted(() => {
@@ -790,7 +719,6 @@ onMounted(() => {
   }
 
   .conv-title {
-    flex: 1;
     font-size: 13.5px;
     color: #4B5563;
     overflow: hidden;
@@ -798,16 +726,28 @@ onMounted(() => {
     white-space: nowrap;
     transition: all 0.2s;
   }
+
+  .conv-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .conv-user {
+    font-size: 12px;
+    color: #8B87B5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .conversation-list {
   flex: 1;
   overflow-y: auto;
   padding: 8px 0;
-
-  :deep(.el-dropdown) {
-    display: block;
-  }
 
   .list-header {
     padding: 10px 14px;

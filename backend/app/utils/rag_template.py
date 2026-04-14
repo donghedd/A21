@@ -9,12 +9,12 @@ from collections import defaultdict
 
 # Default RAG Template - OpenWebUI style with multi-source support
 DEFAULT_RAG_TEMPLATE = """### 任务:
-使用提供的上下文回答用户问题。上下文包含多个来源的文档内容，请综合所有相关信息给出完整、全面的回答。
+使用提供的上下文回答用户问题。上下文可能同时包含文档片段和知识图谱节点，请综合所有相关信息给出完整、全面的回答。
 
 ### 指南:
-- **综合多个来源的信息**：不要只依赖单一来源，请整合所有相关来源的信息
+- **综合多个来源的信息**：不要只依赖单一来源，请整合文档片段和知识图谱节点中的相关信息
 - **使用[id]格式标注引用**：在回答中使用[1], [2]等格式标注引用来源
-- **按文件组织信息**：如果不同文件包含相关信息，请分别说明
+- **按来源组织信息**：如果不同文件或图谱节点包含相关信息，请分别说明
 - **如果不知道答案**，明确说明知识库中没有相关信息
 - **如果不同来源有冲突**，请说明并给出你的判断
 - **使用与用户问题相同的语言回答**
@@ -81,7 +81,10 @@ def get_source_context(sources: List[Dict[str, Any]], include_content: bool = Tr
     # Group sources by file for better organization
     file_sources = defaultdict(list)
     for source in sources:
+        source_type = source.get('source_type', 'document')
         file_name = source.get('file_name', 'Unknown')
+        if source_type == 'kg':
+            file_name = file_name or '知识图谱'
         file_sources[file_name].append(source)
     
     context_string = ''
@@ -99,7 +102,11 @@ def get_source_context(sources: List[Dict[str, Any]], include_content: bool = Tr
             
             # Construct name: "文件名 - 章节路径"
             name_parts = []
-            if source.get('file_name'):
+            if source.get('source_type') == 'kg':
+                name_parts.append(source.get('file_name') or '知识图谱')
+                if source.get('node_name'):
+                    name_parts.append(source['node_name'])
+            elif source.get('file_name'):
                 name_parts.append(source['file_name'])
             
             if section_path:

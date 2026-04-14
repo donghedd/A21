@@ -178,7 +178,7 @@
         <el-table-column label="分块" width="60" align="center">
           <template #default="{ row }">{{ row.chunk_count || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="140" align="center">
+        <el-table-column label="操作" width="190" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.status === 'failed' || row.status === 'pending'"
@@ -187,6 +187,13 @@
               link
               @click="reprocessFile(row)"
             >{{ row.status === 'pending' ? '处理' : '重试' }}</el-button>
+            <el-button
+              v-if="row.status !== 'completed'"
+              size="small"
+              type="info"
+              link
+              @click="cancelFile(row)"
+            >取消</el-button>
             <el-button
               size="small"
               type="danger"
@@ -346,6 +353,17 @@ async function deleteFile(file) {
     invalidateCache('knowledge:bases')
     loadKnowledgeBases()
     ElMessage.success('已删除')
+  } catch {}
+}
+
+async function cancelFile(file) {
+  try {
+    await ElMessageBox.confirm('确定取消该文件当前操作？取消后文件将从知识库中移除。')
+    await fileApi.deleteFile(file.id)
+    currentFiles.value = currentFiles.value.filter(f => f.id !== file.id)
+    invalidateCache('knowledge:bases')
+    loadKnowledgeBases()
+    ElMessage.success('已取消')
   } catch {}
 }
 

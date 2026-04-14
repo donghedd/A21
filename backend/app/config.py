@@ -78,6 +78,11 @@ class Config:
     RAG_ENABLE_MULTI_SOURCE = os.getenv('RAG_ENABLE_MULTI_SOURCE', 'true').lower() == 'true'
     RAG_MAX_CHUNKS_PER_FILE = int(os.getenv('RAG_MAX_CHUNKS_PER_FILE', 3))  # 每个文件最多返回的chunk数
     RAG_MIN_FILES = int(os.getenv('RAG_MIN_FILES', 2))  # 至少来自多少个不同文件
+    RAG_ENABLE_KG_FUSION = os.getenv('RAG_ENABLE_KG_FUSION', 'true').lower() == 'true'
+    RAG_FUSION_DOCUMENT_LIMIT = int(os.getenv('RAG_FUSION_DOCUMENT_LIMIT', 10))
+    RAG_FUSION_DOCUMENT_WEIGHT = float(os.getenv('RAG_FUSION_DOCUMENT_WEIGHT', 1.0))
+    RAG_FUSION_KG_WEIGHT = float(os.getenv('RAG_FUSION_KG_WEIGHT', 1.0))
+    RAG_FUSION_MAX_KG_RESULTS = int(os.getenv('RAG_FUSION_MAX_KG_RESULTS', 3))
     
     # File Upload
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 50 * 1024 * 1024))
@@ -128,6 +133,10 @@ class Config:
     NEO4J_USERNAME = os.getenv('NEO4J_USERNAME', 'neo4j')
     NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'neo4j')
     NEO4J_DATABASE = os.getenv('NEO4J_DATABASE', 'neo4j')
+    KG_CHAT_TOP_K = int(os.getenv('KG_CHAT_TOP_K', 3))
+    KG_CHAT_CANDIDATE_MULTIPLIER = int(os.getenv('KG_CHAT_CANDIDATE_MULTIPLIER', 3))
+    KG_CHAT_MIN_SCORE = float(os.getenv('KG_CHAT_MIN_SCORE', 0.2))
+    KG_CHAT_MAX_RESOURCES_PER_NODE = int(os.getenv('KG_CHAT_MAX_RESOURCES_PER_NODE', 2))
 
     # Search Enhancement for Knowledge Graph
     KG_SEARCH_BACKEND = os.getenv('KG_SEARCH_BACKEND', 'builtin')

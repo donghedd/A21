@@ -13,6 +13,7 @@ import logging
 from ..extensions import db
 from ..models import Conversation, Message, CustomModel, KnowledgeBase, ModelKnowledgeBinding, ExternalModel, ExternalModelKnowledgeBinding
 from .rag_service import get_rag_service
+from .fusion_retriever import get_fusion_retriever
 from .llm_factory import get_llm_service
 from .external_model_service import get_external_model_service
 from ..utils.rag_template import format_rag_prompt
@@ -121,6 +122,7 @@ class ChatService:
 
     def __init__(self):
         self._rag_service = None
+        self._fusion_retriever = None
         self._llm_service = None
 
     @property
@@ -128,6 +130,12 @@ class ChatService:
         if self._rag_service is None:
             self._rag_service = get_rag_service()
         return self._rag_service
+
+    @property
+    def fusion_retriever(self):
+        if self._fusion_retriever is None:
+            self._fusion_retriever = get_fusion_retriever()
+        return self._fusion_retriever
 
     @property
     def llm_service(self):
@@ -403,19 +411,33 @@ class ChatService:
             logger.warning("知识库集合名称为空")
             return '', []
 
-        # Query RAG service with configurable top_k
+        # Query document + KG fusion retriever with configurable top_k
         rag_top_k = current_app.config.get('RAG_TOP_K', 10)
         enable_multi_source = current_app.config.get('RAG_ENABLE_MULTI_SOURCE', True)
+        enable_kg_fusion = current_app.config.get('RAG_ENABLE_KG_FUSION', True)
+        document_limit = current_app.config.get('RAG_FUSION_DOCUMENT_LIMIT', rag_top_k)
+        kg_limit = current_app.config.get('KG_CHAT_TOP_K', 3)
 
-        logger.info(f"RAG参数: top_k={rag_top_k}, multi_source={enable_multi_source}")
+        logger.info(
+            "RAG参数: top_k=%s, multi_source=%s, enable_kg_fusion=%s, "
+            "document_limit=%s, kg_limit=%s",
+            rag_top_k,
+            enable_multi_source,
+            enable_kg_fusion,
+            document_limit,
+            kg_limit
+        )
         logger.info(f"查询集合: {collection_names}")
 
-        results = self.rag_service.query(
+        results = self.fusion_retriever.retrieve_sources(
             query=query,
             collection_names=collection_names,
-            n_results=rag_top_k,
+            top_k=rag_top_k,
             enable_rerank=True,
-            enable_multi_source=enable_multi_source
+            enable_multi_source=enable_multi_source,
+            enable_kg=enable_kg_fusion,
+            document_limit=document_limit,
+            kg_limit=kg_limit
         )
 
         logger.info(f"RAG检索结果数量: {len(results) if results else 0}")
@@ -433,8 +455,12 @@ class ChatService:
         file_groups = defaultdict(list)
         
         for i, result in enumerate(results):
-            metadata = result.get('metadata', {})
-            file_name = metadata.get('file_name', 'Unknown')
+            metadata = result.get('metadata') or {}
+            file_name = (
+                result.get('file_name')
+                or metadata.get('file_name')
+                or 'Unknown'
+            )
             file_groups[file_name].append({
                 'index': i,
                 'result': result
@@ -450,8 +476,8 @@ class ChatService:
             
             for item in file_results:
                 result = item['result']
-                metadata = result.get('metadata', {})
-                content = result['content']
+                metadata = result.get('metadata') or {}
+                content = result.get('content', '')
                 
                 # Add content with source ID
                 context_parts.append(f"[{source_id}] {content}")
@@ -461,10 +487,14 @@ class ChatService:
                     'id': source_id,
                     'content': content,
                     'file_name': file_name,
-                    'file_id': metadata.get('file_id'),
-                    'section_path': metadata.get('section_path', []),
-                    'section_title': metadata.get('section_title', ''),
-                    'score': result.get('score', 1 - result.get('distance', 0))
+                    'file_id': result.get('file_id') or metadata.get('file_id'),
+                    'section_path': result.get('section_path', metadata.get('section_path', [])),
+                    'section_title': result.get('section_title', metadata.get('section_title', '')),
+                    'score': result.get('score', 1 - result.get('distance', 0)),
+                    'source_type': result.get('source_type', 'document'),
+                    'node_id': result.get('node_id'),
+                    'node_name': result.get('node_name'),
+                    'node_labels': result.get('node_labels', []),
                 })
                 source_id += 1
         

@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "name": "A21 KG+文档真实评测集",
+    "description": "对齐当前真实入库文档与 Neo4j 图谱的最小可运行融合评测集",
+    "default_k_values": [1, 3, 5, 10]
+  },
+  "queries": [
+    {
+      "id": "a21_q001",
+      "query": "电机过热的原因有哪些？",
+      "notes": "对齐 ship_electrical_guide_ruan.md 中关于电动机过热故障树的内容",
+      "relevant_files": [
+        {
+          "file_name": "ship_electrical_guide_ruan.md"
+        }
+      ],
+      "relevant_chunks": [
+        {
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 20
+        }
+      ],
+      "relevant_kg_nodes": [
+        {
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:137",
+          "node_name": "机过热",
+          "labels": ["Fault"]
+        }
+      ],
+      "metadata": {
+        "label_status": "runtime",
+        "comment": "chunk 标注沿用现有本地评测集，KG 节点来自当前 Neo4j 实例"
+      }
+    },
+    {
+      "id": "a21_q002",
+      "query": "发电机电压不稳定怎么排查？",
+      "notes": "对齐发电机电压相关故障排查内容",
+      "relevant_files": [
+        {
+          "file_name": "ship_electrical_guide_ruan.md"
+        }
+      ],
+      "relevant_chunks": [
+        {
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 870
+        },
+        {
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 903
+        },
+        {
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 904
+        }
+      ],
+      "relevant_kg_nodes": [
+        {
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:11",
+          "node_name": "发电机",
+          "labels": ["Device"]
+        },
+        {
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:645",
+          "node_name": "检查电压",
+          "labels": ["Action"]
+        }
+      ],
+      "metadata": {
+        "label_status": "runtime",
+        "comment": "KG gold 选取发电机设备与电压检查动作"
+      }
+    },
+    {
+      "id": "a21_q003",
+      "query": "绝缘电阻应该怎么测量？",
+      "notes": "对齐绝缘电阻测量与兆欧表相关内容",
+      "relevant_files": [
+        {
+          "file_name": "ship_electrical_guide_ruan.md"
+        }
+      ],
+      "relevant_chunks": [
+        {
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 100
+        },
+        {
+          "file_name": "ship_electrical_guide_ruan.md",
+          "chunk_index": 101
+        }
+      ],
+      "relevant_kg_nodes": [
+        {
+          "node_id": "4:8857b177-fef7-402d-8ce0-510025ebf11b:719",
+          "node_name": "绝缘电阻",
+          "labels": ["Parameter"]
+        }
+      ],
+      "metadata": {
+        "label_status": "runtime",
+        "comment": "KG gold 选取绝缘电阻参数节点"
+      }
+    }
+  ]
+}

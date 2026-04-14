@@ -7,7 +7,6 @@ import hashlib
 import shutil
 from typing import Optional
 from flask import current_app
-from werkzeug.utils import secure_filename
 import logging
 
 from ..extensions import db
@@ -19,6 +18,17 @@ logger = logging.getLogger(__name__)
 
 class FileService:
     """Service for file upload and processing"""
+
+    @staticmethod
+    def normalize_original_filename(filename: str) -> str:
+        """Preserve user-facing filenames, including Chinese characters."""
+        if not filename:
+            return ''
+
+        normalized = filename.replace('\\', '/').split('/')[-1]
+        normalized = normalized.strip().strip('. ')
+        normalized = ''.join(ch for ch in normalized if ch not in '\x00\r\n\t')
+        return normalized[:255]
     
     @staticmethod
     def allowed_file(filename: str) -> bool:
@@ -45,8 +55,10 @@ class FileService:
         if not kb.can_edit(user):
             raise ValueError("Permission denied")
         
-        # Secure filename and generate unique name
-        original_filename = secure_filename(file.filename)
+        # Preserve the original display name, including Chinese characters.
+        original_filename = FileService.normalize_original_filename(file.filename)
+        if not original_filename or '.' not in original_filename:
+            raise ValueError("Invalid filename")
         file_ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
         unique_filename = f"{uuid.uuid4()}.{file_ext}"
         
@@ -90,6 +102,7 @@ class FileService:
             raise ValueError("Source file not found")
 
         filename = os.path.basename(source_path)
+        filename = FileService.normalize_original_filename(filename)
         if not FileService.allowed_file(filename):
             raise ValueError(
                 f"File type not allowed. Allowed: {', '.join(sorted(current_app.config['ALLOWED_EXTENSIONS']))}"

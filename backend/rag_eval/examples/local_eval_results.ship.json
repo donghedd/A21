@@ -1,0 +1,834 @@
+{
+  "generated_at": "2026-04-13T03:20:42.320675Z",
+  "dataset": {
+    "name": "船舶电气本地离线评测集",
+    "description": "针对当前 data 目录人工对齐后的最小可运行评测集",
+    "query_count": 3,
+    "k_values": [
+      1,
+      3,
+      5,
+      10
+    ]
+  },
+  "retrieval_settings": {
+    "collection_names": [
+      "local_corpus"
+    ],
+    "enable_rerank": false,
+    "enable_hybrid": false,
+    "enable_multi_source": false,
+    "relevance_threshold": 0.0
+  },
+  "summary": {
+    "dataset_name": "船舶电气本地离线评测集",
+    "dataset_description": "针对当前 data 目录人工对齐后的最小可运行评测集",
+    "total_queries": 3,
+    "skipped_queries_without_any_labels": 0,
+    "collection_count": 1,
+    "collection_names": [
+      "local_corpus"
+    ],
+    "k_values": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "levels": {
+      "file": {
+        "queries_with_labels": 3,
+        "queries_without_labels": 0,
+        "averages": {
+          "1": {
+            "recall": 0.0,
+            "hit_rate": 0.0,
+            "mrr": 0.0
+          },
+          "3": {
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "mrr": 0.444444
+          },
+          "5": {
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "mrr": 0.444444
+          },
+          "10": {
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "mrr": 0.444444
+          }
+        }
+      },
+      "chunk": {
+        "queries_with_labels": 3,
+        "queries_without_labels": 0,
+        "averages": {
+          "1": {
+            "recall": 0.0,
+            "hit_rate": 0.0,
+            "mrr": 0.0
+          },
+          "3": {
+            "recall": 0.333333,
+            "hit_rate": 0.333333,
+            "mrr": 0.166667
+          },
+          "5": {
+            "recall": 0.333333,
+            "hit_rate": 0.333333,
+            "mrr": 0.166667
+          },
+          "10": {
+            "recall": 0.333333,
+            "hit_rate": 0.333333,
+            "mrr": 0.166667
+          }
+        }
+      }
+    },
+    "settings": {
+      "enable_rerank": false,
+      "enable_hybrid": false,
+      "enable_multi_source": false,
+      "relevance_threshold": 0.0
+    }
+  },
+  "queries": [
+    {
+      "id": "ship_q001",
+      "query": "电机过热的原因有哪些？",
+      "notes": "对应书中关于电动机过热故障树的内容",
+      "metadata": {
+        "label_status": "manual",
+        "comment": "依据当前本地切块结果人工对齐"
+      },
+      "skipped": false,
+      "gold": {
+        "files": [
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md"
+          }
+        ],
+        "chunks": [
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+            "chunk_index": 20
+          }
+        ]
+      },
+      "retrieved_results": [
+        {
+          "rank": 1,
+          "file_id": null,
+          "file_name": "1-50.md",
+          "chunk_index": 13,
+          "section_title": "四、举例说明建造故障树的过程",
+          "section_path": [
+            "四、举例说明建造故障树的过程"
+          ],
+          "score": 43.615343,
+          "distance": 0.022414,
+          "preview": "# 四、举例说明建造故障树的过程 例1：交流电动拖动系统。 交流电动拖动系统如图1-2所示，求做顶事件为电动机过热的故障树。 图1-2 交流电动拖动系统 解：假定导线接触良好，用演绎法，导致电动机过热的直接原因是过电流，间接原因是散热条件。所以，就有如下逻辑过程： 由上述逻辑关系，按故障树的符号把它们连接起来，就形成了一棵关于电动机过热的故障树，如图1..."
+        },
+        {
+          "rank": 2,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 20,
+          "section_title": "例一 交流电动拖动系统",
+          "section_path": [
+            "例一 交流电动拖动系统"
+          ],
+          "score": 40.35493,
+          "distance": 0.024181,
+          "preview": "# 例一 交流电动拖动系统 交流电动拖动系统如图1-2所示，求作顶事件为电动机过热的故障树。 解：假定导线接触良好，用演绎法，导致电动机过热的直接原因是过流，间接原因是散热条件。所以，就有如下逻辑过程： 图1-2 交流电动拖动系统 有了这种逻辑关系，我们只要按故障树的符号把它们连接起来，就成了一棵关于电动机过热故障树。如图1-3所示。 图1-3 电动机..."
+        },
+        {
+          "rank": 3,
+          "file_id": null,
+          "file_name": "101-150.md",
+          "chunk_index": 24,
+          "section_title": "6. 电枢绕组过热或烧毁",
+          "section_path": [
+            "6. 电枢绕组过热或烧毁"
+          ],
+          "score": 38.021757,
+          "distance": 0.025627,
+          "preview": "# 6. 电枢绕组过热或烧毁 电枢绕组过热的根本原因是过电流。造成过电流的原因有：①电动机长期过载；②电枢绕组短路或换向极线圈短路；③负载不变时，外加电压低于额定值；④发电机外部负载发生短路，造成电流过大；⑤电动机正、反起动过于频繁；⑥定、转子相互摩擦，造成阻力矩增大等。"
+        },
+        {
+          "rank": 4,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 442,
+          "section_title": "6. 电枢绕组过热或烧毁",
+          "section_path": [
+            "6. 电枢绕组过热或烧毁"
+          ],
+          "score": 37.592831,
+          "distance": 0.025912,
+          "preview": "# 6. 电枢绕组过热或烧毁 电枢绕组过热的根本原因是过流。造成过流的原因有： ①长期过载；②电枢绕组短路或换向极线圈短路；③负载不变时，外加电压低于额定值；④发电机外部负载发生短路，造成电流过大；⑤电动机正、反起动过于频繁；⑥定、转子相摩擦，造成阻力矩增大等。"
+        },
+        {
+          "rank": 5,
+          "file_id": null,
+          "file_name": "101-150.md",
+          "chunk_index": 127,
+          "section_title": "（1）电动机过热，甚至烧坏",
+          "section_path": [
+            "（1）电动机过热，甚至烧坏"
+          ],
+          "score": 27.5251,
+          "distance": 0.035057,
+          "preview": "# （1）电动机过热，甚至烧坏 产生这种故障的原因主要有以下几个方面： 1）重载超速。国产恒功率电动机起货机应用负载继电器ZJ来防止负载超过半载升高速，但ZJ的可靠性差，不能很好地起到保护作用，经过不断改进，现推出晶体管式负载继电器，该负载继电器灵敏度高，对电网电压波动影响小。负载继电器失灵是造成重载超速运 行的主要原因，若不及时发现、调整修复，就会发..."
+        },
+        {
+          "rank": 6,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 785,
+          "section_title": "(3) 自动保护和声光报警",
+          "section_path": [
+            "(3) 自动保护和声光报警"
+          ],
+          "score": 26.85667,
+          "distance": 0.035898,
+          "preview": "# (3) 自动保护和声光报警 在下列情况下自动保护并报警： 危险水位时，自动熄灭，后扫气，报警； 汽压达到最大时，自动熄灭，放汽并报警； 点火失败时，自动熄灭，后扫气，报警。 应当指出，船舶辅锅炉的自动控制系统比较复杂，线路的种类也很多，目前正在开发研制，有些已成产品的微机控制系统，但是不管哪一种控制线路（或方案），都离不开上述的 基本技术要求。对于..."
+        },
+        {
+          "rank": 7,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 443,
+          "section_title": "7. 磁场线圈过热",
+          "section_path": [
+            "7. 磁场线圈过热"
+          ],
+          "score": 26.352443,
+          "distance": 0.03656,
+          "preview": "# 7. 磁场线圈过热 它可分为人为的和非人为的两种原因。人为的原因：当发电机转速过低或人为错误地把复激线圈接反，而造成端电压下降时，人为地调整激磁电压，造成激磁线圈过流。引起磁场线圈过热。非人为原因如并励绕组部分短路。"
+        },
+        {
+          "rank": 8,
+          "file_id": null,
+          "file_name": "51-100.md",
+          "chunk_index": 153,
+          "section_title": "6. 轴承过热",
+          "section_path": [
+            "6. 轴承过热"
+          ],
+          "score": 26.057677,
+          "distance": 0.036958,
+          "preview": "# 6. 轴承过热 从轴承本身故障、润滑故障和安装故障三个方面分析，建造故障树如图5-7所示，造成 该故障的原因有10个。 检查步骤：当电动机转动运行达到额定转速时，首先听是否伴有噪声，如果没有，说明润滑方面故障；如果有噪声，把联轴器脱离，这时电动机空载运行，若这时噪声消失，说明联轴器安装不良；如果噪声仍然存在、振动，说明轴或轴承本身故障，需要解体检查。"
+        },
+        {
+          "rank": 9,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 403,
+          "section_title": "6. 轴承过热",
+          "section_path": [
+            "6. 轴承过热"
+          ],
+          "score": 25.457311,
+          "distance": 0.037797,
+          "preview": "# 6. 轴承过热 我们从轴承本身故障，润滑故障和安装故障三个方面来分析，从而可造出该故障树，如图5-7所示。造成该故障的原因有十个。检查步骤如下： 当电动机转动运行达到额定转速时，首先听是否伴有噪声，如果没有，说明润滑方面故障。如果有噪声，把联轴器脱离，这时电动机空载运行。若这时噪声消失，说明联轴器安装不良；如 图5-6 振动过人故障树 图5-7 “..."
+        },
+        {
+          "rank": 10,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 400,
+          "section_title": "3. 电动机温升高",
+          "section_path": [
+            "3. 电动机温升高"
+          ],
+          "score": 25.188125,
+          "distance": 0.038185,
+          "preview": "# 3. 电动机温升高 我们从电源、电机本身，机械和散热四个方面来分析，可以建造其故障树，如图5-4所示。由故障树可知，造成该故障的原因有十二个。检查步骤： 首先检查是否缺相，线路电压与电动机的额定电压是否相符合，其次检查机械方面是否长期过载？噪声是否很大？散热条件是否恶化；通过上述检查，没有发现原因，再进一步检查电动机本身造成温升过高的原因。"
+        }
+      ],
+      "evaluations": {
+        "file": {
+          "level": "file",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            }
+          }
+        },
+        "chunk": {
+          "level": "chunk",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ship_q002",
+      "query": "发电机电压不稳定怎么排查？",
+      "notes": "对应发电机电压监视和不能建立电压的检修表",
+      "metadata": {
+        "label_status": "manual",
+        "comment": "基于当前文档中发电机电压相关故障排查内容对齐"
+      },
+      "skipped": false,
+      "gold": {
+        "files": [
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md"
+          }
+        ],
+        "chunks": [
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+            "chunk_index": 870
+          },
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+            "chunk_index": 903
+          },
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+            "chunk_index": 904
+          }
+        ]
+      },
+      "retrieved_results": [
+        {
+          "rank": 1,
+          "file_id": null,
+          "file_name": "51-100.md",
+          "chunk_index": 5,
+          "section_title": "（4）二极管",
+          "section_path": [
+            "（4）二极管"
+          ],
+          "score": 25.981578,
+          "distance": 0.037062,
+          "preview": "极管相同。这样，当把稳压管接入电路以后，若由于电源电压发生波动或其他原因造成电路中各点电压变动时，负载两端的电压将基本保持不变。 稳压二极管的故障主要表现在开路、短路和稳压值不稳定。在这三种故障中，前一种故障表现出电源电压升高；后两种故障表现为电源电压变低到0V或输出不稳定。 常用稳压二极管有1N4728、1N4729、1N4730、1N4732、1N..."
+        },
+        {
+          "rank": 2,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 1166,
+          "section_title": "（4）执行器不稳定",
+          "section_path": [
+            "（4）执行器不稳定"
+          ],
+          "score": 23.310292,
+          "distance": 0.041135,
+          "preview": "# （4）执行器不稳定 造成这种故障的原因有：①执行器的比例增益太大；②调节器的增益太高；③调节器的“死区”太小。所以，这时只需调节这些参数，使执行器能够稳定运行。 由这个例子可见，对于微机监控系统的维修，维修人员应仔细阅读说明书和用户手册，了解了系统的功能、结构、布局、工作原理或过程以及故障现象。充分利用系统本身的自检功能，就能比较方便地找出故障原因..."
+        },
+        {
+          "rank": 3,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 937,
+          "section_title": "3. $\\mathbf{SCR}_1$ 的关断电路",
+          "section_path": [
+            "3. $\\mathbf{SCR}_1$ 的关断电路"
+          ],
+          "score": 23.125807,
+          "distance": 0.041449,
+          "preview": "# 3. $\\mathbf{SCR}_1$ 的关断电路 由于 $SCR_{1}$ 是使用在直流电路中，一旦触发导通后，就不能自行关断，所以，应设置 $SCR_{1}$ 关断电路。在 $B_{k}$ 电源变压器的 $W_{1}$ 的电源正半波，单结晶体管 $BT_{2}$ 振荡器就输出触发脉冲系列，触发 $SCR_{2}$ ，使电容 $C_{6}$ 已充..."
+        },
+        {
+          "rank": 4,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 945,
+          "section_title": "2. 故障检修方法",
+          "section_path": [
+            "2. 故障检修方法"
+          ],
+          "score": 23.04601,
+          "distance": 0.041587,
+          "preview": "# 2. 故障检修方法 与可控相复励自励恒压发电系统一样，首先区别故障是属于动态特性，还是静态特性，动态特性故障就得检查相复励部分，励磁机和旋转整流器，若是静态特性故障——发电机电压偏离额定值，这时，应检查电压校正器，首先调节外接电位器⑥，使发电机端电压回到额定值，若这种调节有效，但调节量不够，可调节电位器U，若通过这些调节无效，应检查印刷电路板的整流..."
+        },
+        {
+          "rank": 5,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 938,
+          "section_title": "3. $\\mathbf{SCR}_1$ 的关断电路",
+          "section_path": [
+            "3. $\\mathbf{SCR}_1$ 的关断电路"
+          ],
+          "score": 22.931409,
+          "distance": 0.041786,
+          "preview": "3. 发电机电压高于额定电压 这种故障属于静态特性故障，说明直流侧分流走的激磁直流太小，甚至没有分流，所以，此时，先调节 $R_{3}$ ，看发电机电压是否回落，分流电流表的读数是否增加，若有变化，说明校正器的触发器和可控硅 $SCR_{1}$ 工作正常，可能分流电阻太大或测量比较电路故障，这时，应检查整流、滤波、比较器中稳压管和 $R_{5}$ 。 ..."
+        },
+        {
+          "rank": 6,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 1036,
+          "section_title": "第五节 船舶电站的调试",
+          "section_path": [
+            "第五节 船舶电站的调试"
+          ],
+          "score": 22.417893,
+          "distance": 0.042702,
+          "preview": "# 第五节 船舶电站的调试 对于新建造的或者经过大修以后的船舶电站，必须按照中国船级社颁发的《钢质海船入级与建造规范》的要求，进行检测、试验和调整。这是一项关于船舶电站质量，保证船舶安全航行的重要工作，必须认真、精心地做好每项调试内容。船舶电站调试都在系泊时，由船舶建造船厂或承修船厂会同接船单位或船舶电管人员、船舶检验部门一起进行。其调试方法与其它船舶..."
+        },
+        {
+          "rank": 7,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 608,
+          "section_title": "2. 工作原理简述",
+          "section_path": [
+            "2. 工作原理简述"
+          ],
+          "score": 22.357705,
+          "distance": 0.042812,
+          "preview": "# 2. 工作原理简述 当扳动主令器上升位置时，图6-32b）中 $d_{1}$ 得电，瞬时闭合，使C1有电，闭合发电机的激磁回路，同时，使C16有电，其常开触头闭合，使制动器有电，松开刹车。移动主令 a) b) c) 图6-32 AEG-TELEFUNKEN吊钩控制原理图 手柄，则 $ZL$ 输出电压 $V_{\\mathrm{ref}}$ 不断升高。..."
+        },
+        {
+          "rank": 8,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 1040,
+          "section_title": "（一）发电机与不可控相复励调压器配合的发电系统调试",
+          "section_path": [
+            "（一）发电机与不可控相复励调压器配合的发电系统调试"
+          ],
+          "score": 21.497469,
+          "distance": 0.044449,
+          "preview": "图7-61 $U = f(I)$ 图7-62 $f = f(P)$ 然后进行电阻一电感负载试验：①先接通电抗器负载，看发电机端电压是否随着无功电流增大，而保持基本不变，若电压下降越来越厉害，说明电流绕组的极性接反，应更正。同时校核功率因数表的指针是否指在零位。②合上电阻负载，并调节电阻，电抗器，使功率因数表 $\\cos \\varphi = 0.8$ 保..."
+        },
+        {
+          "rank": 9,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 944,
+          "section_title": "1. 电压校正器工作原理",
+          "section_path": [
+            "1. 电压校正器工作原理"
+          ],
+          "score": 21.465973,
+          "distance": 0.044512,
+          "preview": "# 1. 电压校正器工作原理 发电机电压通过接插件 $X_{1}$ （ $X1 / 3\\sim X1 / 5$ ）以线电压形式送到电压校正器，经变压器 图7-19 1FC6型无刷励磁发电系统线路原理图 A1-自动电压调整器（图b）；L1-移相电抗器； $C_1\\sim C_3$ -谐振电容；G1-发电机； $V_{2}$ -旋转整流器； $G_{2}$..."
+        },
+        {
+          "rank": 10,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 927,
+          "section_title": "故障检修方法：",
+          "section_path": [
+            "故障检修方法："
+          ],
+          "score": 21.15472,
+          "distance": 0.045137,
+          "preview": "# 故障检修方法： 1. 发电机转速为额定转速，不能建立电压 这种故障，应检查充磁回路，即：电压继电器J的常闭触点是否闭合好，隔离二极管是否开路，充磁电池是否完好，然后，检查发电机本身激磁回路，碳刷是否接触良好，滑环是否有腐蚀、氧化物及不良导电物，激磁线圈是否开路。还有，整流桥的整流元件击穿和续流保护二极管击穿等等，也不能建立电压。 2. 发电机电压偏..."
+        }
+      ],
+      "evaluations": {
+        "file": {
+          "level": "file",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.5,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 2
+            }
+          }
+        },
+        "chunk": {
+          "level": "chunk",
+          "gold_count": 3,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            },
+            "10": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 3,
+              "first_relevant_rank": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ship_q003",
+      "query": "绝缘电阻应该怎么测量？",
+      "notes": "对应兆欧表与绝缘电阻测量章节",
+      "metadata": {
+        "label_status": "manual",
+        "comment": "基于绝缘电阻与兆欧表章节人工对齐"
+      },
+      "skipped": false,
+      "gold": {
+        "files": [
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md"
+          }
+        ],
+        "chunks": [
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+            "chunk_index": 100
+          },
+          {
+            "file_id": null,
+            "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+            "chunk_index": 101
+          }
+        ]
+      },
+      "retrieved_results": [
+        {
+          "rank": 1,
+          "file_id": null,
+          "file_name": "1-50.md",
+          "chunk_index": 70,
+          "section_title": "2. 测量线路对地的绝缘电阻",
+          "section_path": [
+            "2. 测量线路对地的绝缘电阻"
+          ],
+          "score": 35.657481,
+          "distance": 0.02728,
+          "preview": "# 2. 测量线路对地的绝缘电阻 首先将所要测试的线路的电源切断，然后将绝缘电阻表的接线柱L接到所要测试的线路上，接线柱E接地（在船上E接船体），摇动绝缘电阻表发电机至额定转速，指针稳定后所指刻度值为该线路对地的绝缘电阻值。"
+        },
+        {
+          "rank": 2,
+          "file_id": null,
+          "file_name": "51-100.md",
+          "chunk_index": 142,
+          "section_title": "2. 测量绝缘电阻",
+          "section_path": [
+            "2. 测量绝缘电阻"
+          ],
+          "score": 35.468998,
+          "distance": 0.027421,
+          "preview": "# 2. 测量绝缘电阻 用绝缘电阻表测量大修后或新电动机的冷态绝缘电阻。异步电动机各相绕组对地绝缘电阻和相间绝缘电阻不得低于 $5\\mathrm{M}\\Omega$ 。多速异步电动机应逐个测量各相绕组对地及相间绝缘电阻。直流电动机各绕组之间和各绕组对地的绝缘电阻不得低于 $5\\mathrm{M}\\Omega$ 。"
+        },
+        {
+          "rank": 3,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 877,
+          "section_title": "3. 发电机的烘干",
+          "section_path": [
+            "3. 发电机的烘干"
+          ],
+          "score": 35.37875,
+          "distance": 0.027489,
+          "preview": "# 3. 发电机的烘干 凡是发电机因受潮而绝缘电阻低于规定值时，必须进行烘干，烘干方法参照电动机绕组烘干的一些方法。但需注意绕组的温度不得超过 $80^{\\circ}$ ；加热应缓慢进行，烘干开始后，每隔 $30\\mathrm{min}$ 测量一次温度和绝缘电阻，当温度稳定后，每隔 $1\\sim 2\\mathrm{h}$ 测量一次，并作好记录。最后烘干..."
+        },
+        {
+          "rank": 4,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 392,
+          "section_title": "2. 测量绝缘电阻",
+          "section_path": [
+            "2. 测量绝缘电阻"
+          ],
+          "score": 35.22376,
+          "distance": 0.027606,
+          "preview": "# 2. 测量绝缘电阻 用兆欧表测量大修后或新的电动机测量冷态绝缘电阻。 异步电动机各相对地绝缘电阻和相间绝缘电阻不得低于 $5\\mathrm{M}\\Omega_{\\circ}$ 多速异步电动机应逐个测量各绕组对地及相同绝缘电阻。 直流电动机各绕组之间和各绕组对地的绝缘电阻不得低于 $5\\mathrm{M}\\Omega_{\\mathrm{c}}$"
+        },
+        {
+          "rank": 5,
+          "file_id": null,
+          "file_name": "[船舶电气设备维修指南].阮礽忠.md",
+          "chunk_index": 1036,
+          "section_title": "第五节 船舶电站的调试",
+          "section_path": [
+            "第五节 船舶电站的调试"
+          ],
+          "score": 34.967015,
+          "distance": 0.027803,
+          "preview": "# 第五节 船舶电站的调试 对于新建造的或者经过大修以后的船舶电站，必须按照中国船级社颁发的《钢质海船入级与建造规范》的要求，进行检测、试验和调整。这是一项关于船舶电站质量，保证船舶安全航行的重要工作，必须认真、精心地做好每项调试内容。船舶电站调试都在系泊时，由船舶建造船厂或承修船厂会同接船单位或船舶电管人员、船舶检验部门一起进行。其调试方法与其它船舶..."
+        },
+        {
+          "rank": 6,
+          "file_id": null,
+          "file_name": "51-100.md",
+          "chunk_index": 54,
+          "section_title": "3. 测量各导电部件间的绝缘电阻",
+          "section_path": [
+            "3. 测量各导电部件间的绝缘电阻"
+          ],
+          "score": 34.750575,
+          "distance": 0.027972,
+          "preview": "# 3. 测量各导电部件间的绝缘电阻 需要测量绝缘电阻的部位为：触头分开时各极的动、静触头间；触头在分开与闭合时各极带电部件间；线圈引线与铁心间；各带电部件与地间等。常用绝缘电阻表来测量绝缘电阻。测量时应根据接触器的额定电压来选用绝缘电阻表的电压等级。"
+        },
+        {
+          "rank": 7,
+          "file_id": null,
+          "file_name": "101-150.md",
+          "chunk_index": 47,
+          "section_title": "1. 使用与维护特点",
+          "section_path": [
+            "1. 使用与维护特点"
+          ],
+          "score": 34.046756,
+          "distance": 0.028533,
+          "preview": "# 1. 使用与维护特点 1）使用时应严防潮湿，以防变压器绕组受潮而使绝缘电阻下降。在日常维护中应定期检查变压器的密封是否良好，螺钉有无松动。经常测量变压器绕组的绝缘电阻，用 $500\\mathrm{V}$ 绝缘电阻表测量其相间及对地绝缘电阻应不小于 $0.5\\mathrm{M}\\Omega$ ，低于 $0.2\\mathrm{M}\\Omega$ 时必须..."
+        },
+        {
+          "rank": 8,
+          "file_id": null,
+          "file_name": "1-50.md",
+          "chunk_index": 63,
+          "section_title": "2.绝缘电阻表使用的注意事项",
+          "section_path": [
+            "2.绝缘电阻表使用的注意事项"
+          ],
+          "score": 33.922639,
+          "distance": 0.028635,
+          "preview": "# 2.绝缘电阻表使用的注意事项 1）测量前应先对绝缘电阻表进行一次开路和短路试验，检查仪表是否良好。当接线柱L与E之间不接任何被测物（即处于开路状态）时，以 $120\\mathrm{r / min}$ 的转速顺时针方向转动手柄，观察绝缘电阻表是否指向 $\\infty$ ；再将接线柱L与E短路，慢慢转动手柄，观察绝缘电阻表是否指零，如果满足上述两个条件..."
+        },
+        {
+          "rank": 9,
+          "file_id": null,
+          "file_name": "101-150.md",
+          "chunk_index": 86,
+          "section_title": "（5）定期测量接触器线圈和线路的绝缘电阻",
+          "section_path": [
+            "（5）定期测量接触器线圈和线路的绝缘电阻"
+          ],
+          "score": 33.839642,
+          "distance": 0.028703,
+          "preview": "# （5）定期测量接触器线圈和线路的绝缘电阻 电器线圈的绝缘电阻在低温状态下不得小于 $0.5\\mathrm{M}\\Omega$ 。由于受潮而使绝缘电阻下降的线圈应进行烘干。应保持导线的绝缘良好，各接线端钮处应保持无灰尘和污物堆积。"
+        },
+        {
+          "rank": 10,
+          "file_id": null,
+          "file_name": "1-50.md",
+          "chunk_index": 62,
+          "section_title": "1.绝缘电阻表的选择",
+          "section_path": [
+            "1.绝缘电阻表的选择"
+          ],
+          "score": 33.78543,
+          "distance": 0.028748,
+          "preview": "# 1.绝缘电阻表的选择 选用绝缘电阻表进行绝缘电阻的测量时，一般应使绝缘电阻表的手摇发电机发出的最高电压高于被测对象的额定工作电压，并兼顾到不损坏被测对象，才能正确测试出被测对象在额定工作电压下工作时是否达到了必要的绝缘电阻值。 通常，当测量额定工作电压500V及500V以上（低于1000V）的低压电气设备（元器件）、电缆（电线）、电机或电力变压器的..."
+        }
+      ],
+      "evaluations": {
+        "file": {
+          "level": "file",
+          "gold_count": 1,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 1,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.333333,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 3
+            },
+            "5": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.333333,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 3
+            },
+            "10": {
+              "recall": 1.0,
+              "hit_rate": 1.0,
+              "mrr": 0.333333,
+              "matched_count": 1,
+              "gold_count": 1,
+              "first_relevant_rank": 3
+            }
+          }
+        },
+        "chunk": {
+          "level": "chunk",
+          "gold_count": 2,
+          "metrics": {
+            "1": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 2,
+              "first_relevant_rank": null
+            },
+            "3": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 2,
+              "first_relevant_rank": null
+            },
+            "5": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 2,
+              "first_relevant_rank": null
+            },
+            "10": {
+              "recall": 0.0,
+              "hit_rate": 0.0,
+              "mrr": 0.0,
+              "matched_count": 0,
+              "gold_count": 2,
+              "first_relevant_rank": null
+            }
+          }
+        }
+      }
+    }
+  ],
+  "resolved_targets": {
+    "mode": "local_corpus",
+    "inputs": [
+      "data"
+    ],
+    "chunking": {
+      "chunk_size": 1000,
+      "chunk_overlap": 200,
+      "min_chunk_size": 200,
+      "min_chars": 80,
+      "use_markdown_splitter": true
+    }
+  }
+}
