@@ -778,8 +778,44 @@ async function handleSend({ content, model }) {
 
   conversationStore.startStreaming(currentId, userMessageId, assistantMessageId)
 
+  function finalizeAbortedAssistantMessage() {
+    const partialContent = streaming.currentContent.value
+    const partialThinking = streaming.thinkingContent.value
+    const partialSources = streaming.sources.value || []
+
+    globalStreaming.completeStream(currentId, {
+      messageId: assistantMessageId,
+      userMessageId,
+      content: partialContent,
+      thinking: partialThinking,
+      thinkingDuration: streaming.thinkingDuration.value || 0,
+      sources: partialSources,
+      aborted: true
+    })
+
+    conversationStore.completeStreaming(currentId, {
+      messageId: assistantMessageId,
+      userMessageId,
+      content: partialContent,
+      thinking: partialThinking,
+      thinkingDuration: streaming.thinkingDuration.value || 0,
+      sources: partialSources,
+      aborted: true
+    })
+    conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+      content: partialContent,
+      thinking: partialThinking,
+      thinkingDuration: streaming.thinkingDuration.value || 0,
+      sources: partialSources,
+      isStreaming: false,
+      loading: false,
+      interrupted: true
+    })
+  }
+
   try {
     const signal = streaming.createAbortSignal()
+    globalStreaming.setAbortController(currentId, streaming.getAbortController())
     const modelInfo = availableModels.value.find(m => m.id === model)
 
     let modelParam = null
@@ -882,8 +918,11 @@ async function handleSend({ content, model }) {
       }
     })
   } catch (error) {
-    conversationStore.removeMessage(currentId, assistantMessageId)
-    if (error.name !== 'AbortError') {
+    if (error.name === 'AbortError' || streaming.isAborted.value) {
+      finalizeAbortedAssistantMessage()
+      ElMessage.info('已终止生成')
+    } else {
+      conversationStore.removeMessage(currentId, assistantMessageId)
       ElMessage.error('发送失败')
     }
     streaming.reset()
@@ -941,8 +980,34 @@ async function handleRegenerate(item) {
     p => p.userMessage?.id === userMessageId
   )?.assistantMessage?.id
 
+  function finalizeAbortedAssistantMessage() {
+    const partialContent = streaming.currentContent.value
+    const partialThinking = streaming.thinkingContent.value
+    const partialSources = streaming.sources.value || []
+
+    conversationStore.completeStreaming(currentId, {
+      messageId: assistantMessageId,
+      userMessageId,
+      content: partialContent,
+      thinking: partialThinking,
+      thinkingDuration: streaming.thinkingDuration.value || 0,
+      sources: partialSources,
+      aborted: true
+    })
+    conversationStore.updateAssistantMessage(currentId, assistantMessageId, {
+      content: partialContent,
+      thinking: partialThinking,
+      thinkingDuration: streaming.thinkingDuration.value || 0,
+      sources: partialSources,
+      isStreaming: false,
+      loading: false,
+      interrupted: true
+    })
+  }
+
   try {
     const signal = streaming.createAbortSignal()
+    globalStreaming.setAbortController(currentId, streaming.getAbortController())
     const modelInfo = availableModels.value.find(m => m.id === selectedModel.value)
 
     // 修复模型参数传递：正确区分 ollama 模型和自定义模型
@@ -1020,9 +1085,11 @@ async function handleRegenerate(item) {
       }
     })
   } catch (error) {
-    // 移除临时消息
-    conversationStore.removeMessage(currentId, assistantMessageId)
-    if (error.name !== 'AbortError') {
+    if (error.name === 'AbortError' || streaming.isAborted.value) {
+      finalizeAbortedAssistantMessage()
+      ElMessage.info('已终止生成')
+    } else {
+      conversationStore.removeMessage(currentId, assistantMessageId)
       ElMessage.error('重新生成失败')
     }
     streaming.reset()

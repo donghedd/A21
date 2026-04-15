@@ -516,9 +516,25 @@ class ChatService:
 
         # System message
         system_content = system_prompt or "You are a helpful AI assistant."
+        retrieval_state = self._assess_retrieval_state(user_message, sources or [])
+        focus_label = self._extract_query_focus(user_message)
 
         # If we have sources, use OpenWebUI-style RAG template
         if sources and len(sources) > 0:
+            if retrieval_state == 'weak':
+                system_content += f"""
+
+### 检索结果使用规则：
+当前已经检索到一些相关内容，但这些内容更像背景信息、相关现象或顺带提及，不一定直接回答了用户问题。
+
+你必须遵守：
+1. 先准确说明当前检索到了哪些相关信息。
+2. 只有在来源中明确给出定义、步骤、结论时，才能把它当作直接答案。
+3. 如果来源没有明确给出用户追问的核心内容，请明确说明：
+   根据当前知识库内容，未检索到“{focus_label}”的明确定义或操作步骤。
+4. 不要把顺带提及、背景描述或相邻概念，误说成已经检索到了明确答案。
+"""
+
             # Use the new format_rag_prompt function
             rag_prompt = format_rag_prompt(
                 user_message=user_message,
@@ -542,7 +558,7 @@ When using information from the context, cite the source number (e.g., [1]) at t
 If the context doesn't contain relevant information, answer based on your general knowledge."""
         else:
             # 关键修复：当没有检索到任何内容时，明确告知AI不要编造答案
-            system_content += """
+            system_content += f"""
 
 ### 重要提示：
 当前问题被识别为需要从知识库检索的问题，但知识库中没有找到相关内容。
@@ -550,7 +566,7 @@ If the context doesn't contain relevant information, answer based on your genera
 **你必须遵守以下规则：**
 1. **不要编造任何信息** - 不要提供虚假的来源、文档名称或案例编号
 2. **不要引用不存在的来源** - 不要使用 [1], [2] 等引用标记
-3. **诚实回答** - 明确告知用户知识库中没有找到相关信息
+3. **诚实回答** - 优先明确说明：根据当前知识库内容，未检索到“{focus_label}”的明确定义或操作步骤。
 4. **可以提供建议** - 可以建议用户检查知识库内容或尝试其他关键词
 
 **禁止行为：**
@@ -560,7 +576,7 @@ If the context doesn't contain relevant information, answer based on your genera
 - 提供看似专业但实际虚构的详细技术信息
 
 **正确回答示例：**
-"抱歉，我在知识库中没有找到关于'电机过热'的相关信息。请确保：
+"根据当前知识库内容，未检索到“{focus_label}”的明确定义或操作步骤。请确保：
 1. 知识库中已上传相关文档
 2. 文档已完成索引处理
 3. 尝试使用不同的关键词提问"""
@@ -569,6 +585,58 @@ If the context doesn't contain relevant information, answer based on your genera
         messages.append({'role': 'user', 'content': user_message})
 
         return messages
+
+    def _extract_query_focus(self, user_message: str) -> str:
+        text = (user_message or '').strip()
+        if not text:
+            return '当前问题'
+
+        quoted = re.findall(r'[“"](.*?)[”"]', text)
+        if quoted:
+            return quoted[0].strip() or '当前问题'
+
+        cleaned = text
+        patterns = [
+            r'^(请|帮我|麻烦)?(解释|说明|介绍|告诉我|分析一下|分析|判断一下|判断)?',
+            r'(是什么|是什么意思|是什么原因|怎么做|怎么办|如何处理|怎么处理|如何解决|怎么解决|的定义|的操作步骤)[？?]?$',
+        ]
+        for pattern in patterns:
+            cleaned = re.sub(pattern, '', cleaned)
+        cleaned = cleaned.strip(' ：:，,。？！?')
+
+        if 1 < len(cleaned) <= 24:
+            return cleaned
+        return text[:24] + ('...' if len(text) > 24 else '')
+
+    def _assess_retrieval_state(self, user_message: str, sources: List[Dict[str, Any]]) -> str:
+        if not sources:
+            return 'none'
+
+        query = (user_message or '').lower()
+        query_terms = re.findall(r'[\u4e00-\u9fff]{2,}|[a-z0-9_]{3,}', query)
+        query_terms = [
+            term for term in query_terms
+            if term not in {'什么', '怎么', '如何', '请问', '一下', '这个', '那个', '问题'}
+        ]
+
+        max_score = 0.0
+        lexical_hits = 0
+        for source in sources:
+            score = float(source.get('score') or 0.0)
+            max_score = max(max_score, score)
+            haystack = ' '.join([
+                str(source.get('content') or ''),
+                str(source.get('section_title') or ''),
+                str(source.get('node_name') or ''),
+                ' '.join(source.get('section_path') or [])
+            ]).lower()
+            lexical_hits += sum(1 for term in query_terms if term and term in haystack)
+
+        if lexical_hits >= max(1, min(2, len(query_terms) or 1)):
+            return 'strong'
+        if max_score >= 0.55 and lexical_hits >= 1:
+            return 'strong'
+        return 'weak'
 
     def _build_system_prompt(self, user_message: str, system_prompt: str = None) -> List[Dict[str, str]]:
         """

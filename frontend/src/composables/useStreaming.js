@@ -29,6 +29,10 @@ export function useStreaming() {
     return abortController.signal
   }
 
+  function getAbortController() {
+    return abortController
+  }
+
   /**
    * Abort the current streaming
    */
@@ -209,6 +213,7 @@ export function useStreaming() {
     status,
     processStream,
     createAbortSignal,
+    getAbortController,
     abort,
     reset
   }
