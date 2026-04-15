@@ -219,6 +219,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as knowledgeApi from '@/api/knowledge'
 import * as fileApi from '@/api/file'
 import { getCache, setCache, invalidateCache } from '@/utils/cache'
+import { formatDate as formatBeijingDate } from '@/utils/format'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -390,7 +391,7 @@ function pollStatus(file) {
   }, 2000)
 }
 
-function formatDate(s) { return s ? new Date(s).toLocaleDateString('zh-CN') : '' }
+function formatDate(s) { return formatBeijingDate(s) }
 function formatFileSize(b) {
   if (!b) return '-'
   if (b < 1024) return b + ' B'

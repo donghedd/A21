@@ -3,13 +3,25 @@
  * Common formatting functions
  */
 
+const BEIJING_TIME_ZONE = 'Asia/Shanghai'
+
+function parseBackendDate(dateStr) {
+  if (!dateStr) return null
+  if (dateStr instanceof Date) return dateStr
+
+  const value = String(dateStr)
+  const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value)
+  return new Date(hasTimezone ? value : `${value}Z`)
+}
+
 /**
  * Format date to locale string
  */
 export function formatDate(dateStr, options = {}) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
+  const date = parseBackendDate(dateStr)
   return date.toLocaleDateString('zh-CN', {
+    timeZone: BEIJING_TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -22,8 +34,9 @@ export function formatDate(dateStr, options = {}) {
  */
 export function formatTime(dateStr) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
+  const date = parseBackendDate(dateStr)
   return date.toLocaleTimeString('zh-CN', {
+    timeZone: BEIJING_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit'
   })
@@ -34,8 +47,17 @@ export function formatTime(dateStr) {
  */
 export function formatDateTime(dateStr) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN')
+  const date = parseBackendDate(dateStr)
+  return date.toLocaleString('zh-CN', {
+    timeZone: BEIJING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
 }
 
 /**
@@ -44,7 +66,7 @@ export function formatDateTime(dateStr) {
 export function formatRelativeTime(dateStr) {
   if (!dateStr) return ''
   
-  const date = new Date(dateStr)
+  const date = parseBackendDate(dateStr)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   
@@ -102,6 +124,10 @@ export function formatNumber(num) {
 export function formatPercent(value, decimals = 1) {
   if (value === null || value === undefined) return ''
   return `${(value * 100).toFixed(decimals)}%`
+}
+
+export function parseDateTime(dateStr) {
+  return parseBackendDate(dateStr)
 }
 
 /**

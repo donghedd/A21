@@ -277,6 +277,7 @@ export function useGlobalStreaming() {
         }
       }
     }
+    globalState.activeStreams.delete(conversationId)
     globalState.streamingLocks.delete(conversationId)
   }
 

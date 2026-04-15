@@ -331,6 +331,7 @@ import * as chatApi from '@/api/chat'
 import * as modelApi from '@/api/model'
 import { getItem, setItem } from '@/utils/storage'
 import { getOrFetch, invalidateCache, CACHE_TTL } from '@/utils/cache'
+import { formatDate as formatBeijingDate, parseDateTime } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
@@ -349,7 +350,7 @@ const isCurrentConversationStreaming = computed(() => {
   if (hasStream) return true
 
   // Also check if any message in current conversation is streaming
-  return messages.value.some(m => m.isStreaming)
+  return messages.value.some(m => m.isStreaming && !m.interrupted)
 })
 
 // 状态
@@ -942,6 +943,7 @@ function handleStop() {
 
   // 通过 store 中止流式响应
   conversationStore.abortStreaming(currentId)
+  conversationStore.forceStopStreaming(currentId)
 }
 
 async function handleRegenerate(item) {
@@ -1243,7 +1245,7 @@ function handleSwitchUser() {
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
+  const date = parseDateTime(dateStr)
   const now = new Date()
   const diff = now - date
 
@@ -1261,7 +1263,7 @@ function formatDate(dateStr) {
     return `${days}天前`
   }
 
-  return date.toLocaleDateString('zh-CN')
+  return formatBeijingDate(dateStr)
 }
 
 let prefetchedWorkspaceRoutes = false

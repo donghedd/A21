@@ -4,6 +4,7 @@
  */
 
 import { saveAs } from 'file-saver'
+import { formatDateTime } from './format'
 
 const textEncoder = new TextEncoder()
 
@@ -168,13 +169,13 @@ export function exportMarkdownZip(files, zipName = 'conversations.zip') {
 export function formatConversationAsText(conversation, messages) {
   const lines = []
   lines.push(`# ${conversation.title}`)
-  lines.push(`Exported: ${new Date().toISOString()}`)
+  lines.push(`Exported: ${formatDateTime(new Date())}`)
   lines.push('-'.repeat(50))
   lines.push('')
   
   for (const msg of messages) {
     const role = msg.role.toUpperCase()
-    const time = msg.created_at ? new Date(msg.created_at).toLocaleString() : ''
+    const time = msg.created_at ? formatDateTime(msg.created_at) : ''
     lines.push(`[${role}] (${time})`)
     lines.push(msg.content)
     lines.push('')
@@ -190,7 +191,7 @@ export function formatConversationAsMarkdown(conversation, messages) {
   const lines = []
   lines.push(`# ${conversation.title}`)
   lines.push('')
-  lines.push(`*Exported: ${new Date().toISOString()}*`)
+  lines.push(`*Exported: ${formatDateTime(new Date())}*`)
   lines.push('')
   lines.push('---')
   lines.push('')

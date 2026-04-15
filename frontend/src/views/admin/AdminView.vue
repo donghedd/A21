@@ -359,6 +359,7 @@ import { User, Close, Document, FolderOpened, Setting, ChatDotRound } from '@ele
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as adminApi from '@/api/admin'
 import ConversationHistoryManager from '@/components/history/ConversationHistoryManager.vue'
+import { formatDateTime as formatBeijingDateTime } from '@/utils/format'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -570,7 +571,7 @@ async function saveWorkspaceModel() {
 
 function formatDateTime(value) {
   if (!value) return ''
-  return new Date(value).toLocaleString('zh-CN')
+  return formatBeijingDateTime(value)
 }
 
 // 历史对话相关方法

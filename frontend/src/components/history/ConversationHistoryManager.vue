@@ -264,6 +264,7 @@ import * as chatApi from '@/api/chat'
 import * as adminApi from '@/api/admin'
 import { exportAsMarkdown, exportMarkdownZip, formatConversationAsMarkdown } from '@/utils/export'
 import { AiChat } from '@/components/ai'
+import { formatDateTime, parseDateTime } from '@/utils/format'
 
 const props = defineProps({
   adminMode: { type: Boolean, default: false },
@@ -320,9 +321,9 @@ const filteredConversationHistory = computed(() => {
 
   return conversationHistory.value.filter(item => {
     const titleMatch = !keyword || (item.title || '').toLowerCase().includes(keyword)
-    const updatedAt = item.updated_at ? new Date(item.updated_at) : null
-    const afterStart = !startDate || (updatedAt && updatedAt >= new Date(`${startDate}T00:00:00`))
-    const beforeEnd = !endDate || (updatedAt && updatedAt <= new Date(`${endDate}T23:59:59`))
+    const updatedAt = item.updated_at ? parseDateTime(item.updated_at) : null
+    const afterStart = !startDate || (updatedAt && updatedAt >= new Date(`${startDate}T00:00:00+08:00`))
+    const beforeEnd = !endDate || (updatedAt && updatedAt <= new Date(`${endDate}T23:59:59+08:00`))
     return titleMatch && afterStart && beforeEnd
   })
 })
@@ -570,7 +571,7 @@ async function deleteSelectedConversations() {
 
 function formatDate(value) {
   if (!value) return ''
-  return new Date(value).toLocaleString('zh-CN')
+  return formatDateTime(value)
 }
 
 onMounted(() => {

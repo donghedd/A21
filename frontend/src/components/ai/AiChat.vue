@@ -344,6 +344,7 @@ const titleInput = ref(null)
 const isEditingTitle = ref(false)
 const titleDraft = ref('')
 let userAtBottom = true
+const stopRequestedAt = ref(0)
 
 // 计算属性 - 当前模型名称
 const currentModelName = computed(() => {
@@ -431,7 +432,9 @@ function handleSetDefault(modelId) {
 function handleSend() {
   if (!inputMessage.value.trim()) return
 
-  if (props.isStreaming) {
+  const recentlyStopped = stopRequestedAt.value && Date.now() - stopRequestedAt.value < 2000
+
+  if (props.isStreaming && !recentlyStopped) {
     ElMessageBox.confirm('当前正在生成回答，发送新消息将暂停回答。确定继续吗？', '确认发送', {
       confirmButtonText: '发送',
       cancelButtonText: '取消',
@@ -460,6 +463,7 @@ function handleSend() {
 }
 
 function handleStop() {
+  stopRequestedAt.value = Date.now()
   emit('stop')
 }
 

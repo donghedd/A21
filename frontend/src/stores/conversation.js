@@ -22,6 +22,14 @@ export const useConversationStore = defineStore('conversation', () => {
   // 流式响应状态
   const streamingStates = ref(new Map())
 
+  function refreshConversationMessages() {
+    conversationMessages.value = new Map(conversationMessages.value)
+  }
+
+  function refreshStreamingStates() {
+    streamingStates.value = new Map(streamingStates.value)
+  }
+
   // ==================== Getters ====================
   
   /**
@@ -379,6 +387,7 @@ export const useConversationStore = defineStore('conversation', () => {
       sources: [],
       startedAt: Date.now()
     })
+    refreshStreamingStates()
     
     // 更新消息对状态
     const convData = conversationMessages.value.get(conversationId)
@@ -390,6 +399,7 @@ export const useConversationStore = defineStore('conversation', () => {
         pair.status = 'streaming'
       }
     }
+    refreshConversationMessages()
   }
   
   /**
@@ -399,6 +409,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const state = streamingStates.value.get(conversationId)
     if (state) {
       state.content = content
+      refreshStreamingStates()
     }
   }
   
@@ -409,6 +420,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const state = streamingStates.value.get(conversationId)
     if (state) {
       state.thinking = thinking
+      refreshStreamingStates()
     }
   }
   
@@ -419,6 +431,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const state = streamingStates.value.get(conversationId)
     if (state) {
       state.sources = sources
+      refreshStreamingStates()
     }
   }
   
@@ -430,6 +443,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (state) {
       state.isThinking = true
       state.thinkingStartedAt = Date.now()
+      refreshStreamingStates()
     }
   }
   
@@ -441,6 +455,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (state) {
       state.isThinking = false
       state.thinkingDuration = duration
+      refreshStreamingStates()
     }
   }
   
@@ -462,15 +477,22 @@ export const useConversationStore = defineStore('conversation', () => {
         if (pair) {
           pair.status = 'completed'
           if (pair.assistantMessage) {
-            pair.assistantMessage.isStreaming = false
-            pair.assistantMessage.loading = false
+            pair.assistantMessage = {
+              ...pair.assistantMessage,
+              isStreaming: false,
+              loading: false,
+              interrupted: !!result.aborted
+            }
           }
         }
       }
+      refreshConversationMessages()
+      refreshStreamingStates()
       
       // 延迟清理流式状态
       setTimeout(() => {
         streamingStates.value.delete(conversationId)
+        refreshStreamingStates()
       }, 5000)
     }
   }
@@ -493,13 +515,51 @@ export const useConversationStore = defineStore('conversation', () => {
         if (pair) {
           pair.status = 'completed'
           if (pair.assistantMessage) {
-            pair.assistantMessage.isStreaming = false
-            pair.assistantMessage.loading = false
-            pair.assistantMessage.interrupted = true
+            pair.assistantMessage = {
+              ...pair.assistantMessage,
+              isStreaming: false,
+              loading: false,
+              interrupted: true
+            }
           }
         }
       }
+      refreshConversationMessages()
+      refreshStreamingStates()
     }
+  }
+
+  function forceStopStreaming(conversationId) {
+    if (!conversationId) return
+
+    const convData = conversationMessages.value.get(conversationId)
+    if (convData) {
+      for (const pair of convData.messagePairs) {
+        if (pair.status === 'streaming') {
+          pair.status = 'completed'
+        }
+
+        if (pair.assistantMessage?.isStreaming || pair.assistantMessage?.loading) {
+          pair.assistantMessage = {
+            ...pair.assistantMessage,
+            isStreaming: false,
+            loading: false,
+            interrupted: true
+          }
+        }
+      }
+
+      convData.orphanMessages = (convData.orphanMessages || []).map(message => (
+        message?.isStreaming || message?.loading
+          ? { ...message, isStreaming: false, loading: false, interrupted: true }
+          : message
+      ))
+      convData.lastUpdated = Date.now()
+    }
+
+    streamingStates.value.delete(conversationId)
+    refreshConversationMessages()
+    refreshStreamingStates()
   }
   
   /**
@@ -553,6 +613,7 @@ export const useConversationStore = defineStore('conversation', () => {
     markThinkingEnded,
     completeStreaming,
     abortStreaming,
+    forceStopStreaming,
     clearConversation,
     clearAll
   }

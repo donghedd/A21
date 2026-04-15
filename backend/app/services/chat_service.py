@@ -364,6 +364,66 @@ class ChatService:
             for msg in messages
             if msg.role in ('user', 'assistant')
         ]
+
+    def rewrite_followup_question(self, user_message: str, history: List[Dict[str, str]]) -> str:
+        """Rewrite short follow-up questions into standalone retrieval queries without extra LLM calls."""
+        question = (user_message or '').strip()
+        if not question or not history:
+            return question
+
+        if not self._is_followup_question(question):
+            return question
+
+        topic = self._extract_recent_topic(history)
+        if not topic:
+            return question
+
+        compact_question = question.strip(' ，。？！?')
+        if any(token in compact_question for token in ('解决', '处理', '维修', '排除', '怎么办')):
+            rewritten = f"{topic}的解决方法、排除方法和维修建议"
+        else:
+            rewritten = f"{topic}：{compact_question}"
+        logger.info("Follow-up query rewritten: '%s' -> '%s'", question, rewritten)
+        return rewritten
+
+    def _is_followup_question(self, question: str) -> bool:
+        text = (question or '').strip()
+        if not text:
+            return False
+
+        followup_patterns = [
+            r'^(那|那么|这个|这些|上述|上面|前面|刚才|继续|再说|详细说|展开|其中|它|其|该|此)',
+            r'(呢|如何|怎么处理|怎么排查|原因呢|步骤呢|保护逻辑呢)[？?]?$',
+            r'^(起锚[123一二三]挡|抛锚[123一二三]挡|高速|中速|低速|启动|停机|过载|保护|故障原因)[？?]?$',
+        ]
+
+        if len(text) <= 18 and any(re.search(pattern, text) for pattern in followup_patterns):
+            return True
+
+        pronouns = ['它', '其', '该系统', '该方法', '这种情况', '上述', '上面', '前面']
+        return any(item in text for item in pronouns)
+
+    def _extract_recent_topic(self, history: List[Dict[str, str]]) -> str:
+        for message in reversed(history):
+            if message.get('role') != 'user':
+                continue
+            content = (message.get('content') or '').strip()
+            if not content:
+                continue
+
+            topic = self._extract_query_focus(content)
+            if topic and topic != '当前问题':
+                return topic
+
+        for message in reversed(history):
+            if message.get('role') != 'assistant':
+                continue
+            content = (message.get('content') or '').strip()
+            match = re.search(r'(?:关于|针对|根据当前知识库.*?)([^，。；\n]{4,40})', content)
+            if match:
+                return match.group(1).strip(' ：:“”"')
+
+        return ''
     
     # ==================== RAG-Enhanced Chat ====================
     
@@ -508,7 +568,8 @@ class ChatService:
     
     def build_prompt_with_context(self, user_message: str, context: str,
                                   sources: list = None,
-                                  system_prompt: str = None) -> List[Dict[str, str]]:
+                                  system_prompt: str = None,
+                                  retrieval_query: str = None) -> List[Dict[str, str]]:
         """
         Build messages with RAG context using OpenWebUI-style citation
         """
@@ -516,9 +577,20 @@ class ChatService:
 
         # System message
         system_content = system_prompt or "You are a helpful AI assistant."
-        retrieval_state = self._assess_retrieval_state(user_message, sources or [])
-        focus_label = self._extract_query_focus(user_message)
-        question_intent = self._detect_question_intent(user_message)
+        resolved_question = (retrieval_query or user_message or '').strip()
+        is_rewritten_followup = bool(resolved_question and resolved_question != (user_message or '').strip())
+        retrieval_state = self._assess_retrieval_state(resolved_question, sources or [])
+        focus_label = self._extract_query_focus(resolved_question)
+        question_intent = self._detect_question_intent(resolved_question)
+
+        if is_rewritten_followup:
+            system_content += f"""
+
+### 连续追问理解：
+用户本轮原始追问是：“{user_message}”
+结合上一轮对话，系统已将本轮追问解析为：“{resolved_question}”
+请围绕解析后的完整问题回答，但表达上保持对用户追问的自然回应。
+"""
 
         # If we have sources, use OpenWebUI-style RAG template
         if sources and len(sources) > 0:
@@ -550,7 +622,7 @@ class ChatService:
 
             # Use the new format_rag_prompt function
             rag_prompt = format_rag_prompt(
-                user_message=user_message,
+                user_message=resolved_question,
                 sources=sources,
                 system_prompt=None  # We'll prepend system_content manually
             )
@@ -773,11 +845,14 @@ If the context doesn't contain relevant information, answer based on your genera
             classification = {'type': 'KNOWLEDGE', 'keywords': []}
             context, sources = '', []
 
+            history_for_rewrite = self.get_conversation_history(conversation_id, limit=8)
+            retrieval_message = self.rewrite_followup_question(user_message, history_for_rewrite[:-1])
+
             # Step 1: Classify question
             try:
                 classifier_service = external_service if provider == 'external' and external_service else self.llm_service
                 classifier = QuestionClassifier(classifier_service)
-                classification = classifier.classify(user_message, base_model)
+                classification = classifier.classify(retrieval_message, base_model)
                 question_type = classification.get('type', 'KNOWLEDGE')
                 logger.info(f"Question classified as: {question_type}")
             except Exception as e:
@@ -788,7 +863,7 @@ If the context doesn't contain relevant information, answer based on your genera
             if classification.get('type', 'KNOWLEDGE') == 'KNOWLEDGE' and (effective_custom_model_id or effective_external_model_id):
                 try:
                     context, sources = self.get_rag_context(
-                        user_message,
+                        retrieval_message,
                         effective_custom_model_id,
                         effective_external_model_id
                     )
@@ -824,7 +899,13 @@ If the context doesn't contain relevant information, answer based on your genera
                     logger.warning("没有检索到任何sources，将提示AI不要编造答案")
                 yield self._sse_event('status', {'message': 'Generating response...'})
                 history = self.get_conversation_history(conversation_id, limit=10)
-                messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
+                messages = self.build_prompt_with_context(
+                    user_message,
+                    context,
+                    sources,
+                    system_prompt,
+                    retrieval_query=retrieval_message
+                )
                 if len(history) > 1:
                     for msg in history[:-1]:
                         messages.insert(1, msg)
@@ -1053,11 +1134,13 @@ If the context doesn't contain relevant information, answer based on your genera
             question_type = 'GENERAL'
             keywords = []
             context, sources = '', []
+            history_for_rewrite = self.get_conversation_history(conversation_id, limit=8)
+            retrieval_message = self.rewrite_followup_question(user_message, history_for_rewrite)
 
             try:
                 classifier_service = external_service if provider == 'external' and external_service else self.llm_service
                 classifier = QuestionClassifier(classifier_service)
-                classification = classifier.classify(user_message, base_model)
+                classification = classifier.classify(retrieval_message, base_model)
                 question_type = classification.get('type', 'KNOWLEDGE')
                 keywords = classification.get('keywords', [])
             except Exception as e:
@@ -1069,7 +1152,7 @@ If the context doesn't contain relevant information, answer based on your genera
             if question_type == 'KNOWLEDGE' and (effective_custom_model_id or effective_external_model_id):
                 try:
                     context, sources = self.get_rag_context(
-                        user_message,
+                        retrieval_message,
                         effective_custom_model_id,
                         effective_external_model_id
                     )
@@ -1091,7 +1174,13 @@ If the context doesn't contain relevant information, answer based on your genera
                     yield self._sse_event('sources', {'sources': sources})
                 yield self._sse_event('status', {'message': 'Generating response...'})
                 history = self.get_conversation_history(conversation_id, limit=10)
-                messages = self.build_prompt_with_context(user_message, context, sources, system_prompt)
+                messages = self.build_prompt_with_context(
+                    user_message,
+                    context,
+                    sources,
+                    system_prompt,
+                    retrieval_query=retrieval_message
+                )
                 if len(history) > 1:
                     for msg in history[:-1]:
                         messages.insert(1, msg)
