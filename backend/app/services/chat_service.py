@@ -433,7 +433,7 @@ class ChatService:
             query=query,
             collection_names=collection_names,
             top_k=rag_top_k,
-            enable_rerank=False,
+            enable_rerank=True,
             enable_multi_source=enable_multi_source,
             enable_kg=enable_kg_fusion,
             document_limit=document_limit,
