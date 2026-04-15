@@ -211,7 +211,8 @@ export function formatConversationAsMarkdown(conversation, messages) {
       lines.push('**Sources:**')
       for (const src of msg.sources) {
         const preview = src.content?.slice(0, 100) || ''
-        lines.push(`- [${src.index}] ${preview}...`)
+        const sourceId = src.id ?? src.index ?? src.source_id ?? '?'
+        lines.push(`- [${sourceId}] ${preview}...`)
       }
       lines.push('')
     }

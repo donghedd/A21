@@ -62,9 +62,9 @@ class Config:
     LLAMACPP_N_BATCH = int(os.getenv('LLAMACPP_N_BATCH', '512'))
     
     # RAG Configuration
-    CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', 1000))
-    CHUNK_OVERLAP = int(os.getenv('CHUNK_OVERLAP', 200))
-    CHUNK_MIN_SIZE = int(os.getenv('CHUNK_MIN_SIZE', 200))
+    CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', 800))
+    CHUNK_OVERLAP = int(os.getenv('CHUNK_OVERLAP', 120))
+    CHUNK_MIN_SIZE = int(os.getenv('CHUNK_MIN_SIZE', 160))
     EMBEDDING_BATCH_SIZE = int(os.getenv('EMBEDDING_BATCH_SIZE', 32))
     
     # RAG Search Configuration
@@ -73,13 +73,13 @@ class Config:
     HYBRID_BM25_WEIGHT = float(os.getenv('HYBRID_BM25_WEIGHT', 0.3))
     
     # Multi-source RAG Configuration (Reference: Open-WebUI)
-    RAG_TOP_K = int(os.getenv('RAG_TOP_K', 10))  # 基础检索数量，从5增加到10
+    RAG_TOP_K = int(os.getenv('RAG_TOP_K', 12))  # Increase recall for title-style technical questions
     RAG_TOP_K_RERANKER = int(os.getenv('RAG_TOP_K_RERANKER', 5))  # 重排序后保留数量
     RAG_ENABLE_MULTI_SOURCE = os.getenv('RAG_ENABLE_MULTI_SOURCE', 'true').lower() == 'true'
-    RAG_MAX_CHUNKS_PER_FILE = int(os.getenv('RAG_MAX_CHUNKS_PER_FILE', 3))  # 每个文件最多返回的chunk数
-    RAG_MIN_FILES = int(os.getenv('RAG_MIN_FILES', 2))  # 至少来自多少个不同文件
+    RAG_MAX_CHUNKS_PER_FILE = int(os.getenv('RAG_MAX_CHUNKS_PER_FILE', 5))  # Allow more evidence from same file
+    RAG_MIN_FILES = int(os.getenv('RAG_MIN_FILES', 1))  # Don't force multi-file recall for exact questions
     RAG_ENABLE_KG_FUSION = os.getenv('RAG_ENABLE_KG_FUSION', 'true').lower() == 'true'
-    RAG_FUSION_DOCUMENT_LIMIT = int(os.getenv('RAG_FUSION_DOCUMENT_LIMIT', 10))
+    RAG_FUSION_DOCUMENT_LIMIT = int(os.getenv('RAG_FUSION_DOCUMENT_LIMIT', 12))
     RAG_FUSION_DOCUMENT_WEIGHT = float(os.getenv('RAG_FUSION_DOCUMENT_WEIGHT', 1.0))
     RAG_FUSION_KG_WEIGHT = float(os.getenv('RAG_FUSION_KG_WEIGHT', 1.0))
     RAG_FUSION_MAX_KG_RESULTS = int(os.getenv('RAG_FUSION_MAX_KG_RESULTS', 3))

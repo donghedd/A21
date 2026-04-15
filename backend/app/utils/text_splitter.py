@@ -6,6 +6,62 @@ from typing import List, Dict, Any, Optional
 from ..loaders.base import Document
 
 
+HEADING_PATTERNS = [
+    (re.compile(r'^第[一二三四五六七八九十百零0-9]+篇\s+.+$'), 1),
+    (re.compile(r'^第[一二三四五六七八九十百零0-9]+章\s+.+$'), 1),
+    (re.compile(r'^第[一二三四五六七八九十百零0-9]+节\s+.+$'), 2),
+    (re.compile(r'^\d+(?:\.\d+){1,3}\s+.+$'), None),
+    (re.compile(r'^[（(]?\d+[)）]\s*[^\s].{0,36}$'), 4),
+    (re.compile(r'^[一二三四五六七八九十]+[、.]\s*[^\s].{0,36}$'), 3),
+]
+
+
+def detect_heading_level(line: str) -> Optional[int]:
+    """Detect title-like lines in OCR/txt content and map to markdown levels."""
+    if not line:
+        return None
+
+    text = line.strip()
+    if not text or text.startswith('#'):
+        return None
+
+    if len(text) > 60:
+        return None
+
+    if re.match(r'^(图|表)\s*\d', text):
+        return None
+
+    if text.endswith(('。', '；', ';', '：', ':', '？', '?', '！', '!')):
+        return None
+
+    for pattern, fixed_level in HEADING_PATTERNS:
+        if not pattern.match(text):
+            continue
+        if fixed_level is not None:
+            return fixed_level
+        dot_count = text.split()[0].count('.')
+        return min(4, dot_count + 1)
+
+    return None
+
+
+def normalize_structured_headings(text: str) -> str:
+    """Convert plain-text numbered headings into markdown headings for better chunking."""
+    if not text:
+        return text
+
+    normalized_lines = []
+    for raw_line in text.split('\n'):
+        line = raw_line.rstrip()
+        level = detect_heading_level(line)
+        if level is not None:
+          normalized_lines.append(f"{'#' * level} {line.strip()}")
+        else:
+          normalized_lines.append(line)
+
+    return '\n'.join(normalized_lines)
+
+
 class MarkdownHeaderSplitter:
     """Split text by Markdown headers with enhanced breadcrumb tracking"""
     
@@ -322,9 +378,10 @@ def split_documents(documents: List[Document],
         md_splitter = MarkdownHeaderSplitter(strip_headers=False)
         new_docs = []
         for doc in result:
+            normalized_text = normalize_structured_headings(doc.page_content)
             # Pass existing metadata as base_metadata
             split_docs = md_splitter.split_text(
-                doc.page_content, 
+                normalized_text,
                 base_metadata=doc.metadata
             )
             for split_doc in split_docs:

@@ -4,6 +4,7 @@ Lightweight BM25 implementation using rank_bm25 + jieba for Chinese text.
 Reference: Open WebUI's query_doc_with_hybrid_search approach.
 """
 import logging
+import re
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,16 @@ def tokenize(text: str) -> List[str]:
         return list(jieba.cut_for_search(text))
     # Fallback: simple whitespace split
     return text.lower().split()
+
+
+def normalize_lookup_text(text: str) -> str:
+    """Normalize text for metadata/title matching."""
+    if not text:
+        return ''
+    value = str(text).lower().strip()
+    value = re.sub(r'\s+', '', value)
+    value = re.sub(r'[，。；：、“”‘’（）()\[\]【】\-—_·,.!?？!/:]', '', value)
+    return value
 
 
 def get_enriched_text(doc: str, metadata: Dict[str, Any]) -> str:
@@ -155,6 +166,65 @@ class BM25Retriever:
             })
         
         return results
+
+    def search_title_matches(self, query: str, collection_name: str, vector_service,
+                             n_results: int = 10, terms: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Search by section title / section path / filename match.
+        Useful for title-like technical questions that can be crowded out in large corpora.
+        """
+        if collection_name not in self._index_cache:
+            if not self._build_index(collection_name, vector_service):
+                return []
+
+        cache = self._index_cache[collection_name]
+        query_norm = normalize_lookup_text(query)
+        candidate_terms = [normalize_lookup_text(term) for term in (terms or []) if normalize_lookup_text(term)]
+        if query_norm and query_norm not in candidate_terms:
+            candidate_terms.insert(0, query_norm)
+
+        if not candidate_terms:
+            return []
+
+        ranked = []
+        for idx, (doc, metadata, doc_id) in enumerate(zip(cache['docs'], cache['metadatas'], cache['ids'])):
+            score = self._score_title_match(metadata or {}, candidate_terms)
+            if score <= 0:
+                continue
+            ranked.append({
+                'content': doc,
+                'metadata': metadata,
+                'score': float(score),
+                'id': doc_id,
+                'match_type': 'title'
+            })
+
+        ranked.sort(key=lambda item: item['score'], reverse=True)
+        return ranked[:n_results]
+
+    def _score_title_match(self, metadata: Dict[str, Any], candidate_terms: List[str]) -> float:
+        title = normalize_lookup_text(metadata.get('section_title', ''))
+        section_path = normalize_lookup_text(metadata.get('section_path', ''))
+        file_name = normalize_lookup_text(metadata.get('file_name', ''))
+
+        best = 0.0
+        for term in candidate_terms:
+            if not term:
+                continue
+            if title and term == title:
+                best = max(best, 8.0)
+            elif title and (term in title or title in term):
+                best = max(best, 6.5)
+
+            if section_path and term in section_path:
+                best = max(best, 5.8)
+            if file_name and term in file_name:
+                best = max(best, 5.2)
+
+            if title and any(part and part in title for part in term.split()):
+                best = max(best, 3.2)
+
+        return best
     
     def invalidate_cache(self, collection_name: str = None):
         """Clear BM25 index cache for a collection (or all)."""

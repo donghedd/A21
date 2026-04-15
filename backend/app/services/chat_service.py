@@ -518,10 +518,11 @@ class ChatService:
         system_content = system_prompt or "You are a helpful AI assistant."
         retrieval_state = self._assess_retrieval_state(user_message, sources or [])
         focus_label = self._extract_query_focus(user_message)
+        question_intent = self._detect_question_intent(user_message)
 
         # If we have sources, use OpenWebUI-style RAG template
         if sources and len(sources) > 0:
-            if retrieval_state == 'weak':
+            if retrieval_state == 'weak' and question_intent == 'detail':
                 system_content += f"""
 
 ### 检索结果使用规则：
@@ -533,6 +534,18 @@ class ChatService:
 3. 如果来源没有明确给出用户追问的核心内容，请明确说明：
    根据当前知识库内容，未检索到“{focus_label}”的明确定义或操作步骤。
 4. 不要把顺带提及、背景描述或相邻概念，误说成已经检索到了明确答案。
+"""
+            elif question_intent == 'list':
+                system_content += """
+
+### 检索结果使用规则：
+当前问题属于列举/概述类问题。
+
+你必须遵守：
+1. 只要来源中出现了相关方法名称、类型、分类、要点或简要说明，就可以据此回答。
+2. 优先用“包括/常见有/主要有”等方式归纳当前已检索到的信息。
+3. 如果来源只给出了方法名称而未展开步骤，可以明确补充“知识库中主要提供了方法名称或简要说明，未完整展开每一种方法的详细步骤”。
+4. 不要因为缺少完整操作步骤，就误判为“完全未检索到”。
 """
 
             # Use the new format_rag_prompt function
@@ -558,7 +571,19 @@ When using information from the context, cite the source number (e.g., [1]) at t
 If the context doesn't contain relevant information, answer based on your general knowledge."""
         else:
             # 关键修复：当没有检索到任何内容时，明确告知AI不要编造答案
-            system_content += f"""
+            if question_intent == 'list':
+                system_content += f"""
+
+### 重要提示：
+当前问题属于列举/概述类问题，但知识库中没有检索到足够可靠的相关信息。
+
+**你必须遵守以下规则：**
+1. 不要编造不存在的方法名称、定义或分类。
+2. 明确说明当前知识库中没有检索到足够可靠的相关信息。
+3. 如果合适，可以建议用户提供更具体的设备、章节号或关键词。
+"""
+            else:
+                system_content += f"""
 
 ### 重要提示：
 当前问题被识别为需要从知识库检索的问题，但知识库中没有找到相关内容。
@@ -585,6 +610,42 @@ If the context doesn't contain relevant information, answer based on your genera
         messages.append({'role': 'user', 'content': user_message})
 
         return messages
+
+    def _detect_question_intent(self, user_message: str) -> str:
+        """Distinguish list/overview questions from detail/procedure questions."""
+        text = (user_message or '').strip()
+        if not text:
+            return 'detail'
+
+        list_patterns = [
+            r'有哪些',
+            r'哪几种',
+            r'什么方法',
+            r'常见.*方法',
+            r'常见.*类型',
+            r'包括哪些',
+            r'主要有哪',
+            r'分类',
+            r'种类',
+        ]
+        detail_patterns = [
+            r'步骤',
+            r'流程',
+            r'工作原理',
+            r'控制过程',
+            r'怎么做',
+            r'如何做',
+            r'如何分析',
+            r'操作步骤',
+            r'具体.*分析',
+            r'详细.*分析',
+        ]
+
+        if any(re.search(pattern, text) for pattern in list_patterns):
+            return 'list'
+        if any(re.search(pattern, text) for pattern in detail_patterns):
+            return 'detail'
+        return 'detail'
 
     def _extract_query_focus(self, user_message: str) -> str:
         text = (user_message or '').strip()

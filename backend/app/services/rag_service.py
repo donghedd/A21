@@ -5,6 +5,7 @@ Reference: Open WebUI's retrieval pipeline.
 """
 import hashlib
 import numpy as np
+import re
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
 from flask import current_app
@@ -206,20 +207,30 @@ class RAGService:
                 enable_multi_source = current_app.config.get('RAG_ENABLE_MULTI_SOURCE', True)
             
             relevance_threshold = current_app.config.get('RELEVANCE_THRESHOLD', 0.3)
-            bm25_weight = current_app.config.get('HYBRID_BM25_WEIGHT', 0.3)
             max_per_file = current_app.config.get('RAG_MAX_CHUNKS_PER_FILE', 3)
             min_files = current_app.config.get('RAG_MIN_FILES', 2)
+
+            query_profile = self._build_query_profile(query)
+            retrieval_query = query_profile['retrieval_query']
+            focus_terms = query_profile['focus_terms']
+
+            if query_profile['single_source_focus']:
+                enable_multi_source = False
+                min_files = 1
+                max_per_file = max(max_per_file, n_results or current_app.config.get('RAG_TOP_K', 10))
             
             # Generate embedding for query
-            query_embedding = self.embedding_service.generate_embedding(query)
+            query_embedding = self.embedding_service.generate_embedding(retrieval_query)
             
             # Increase candidate count for better recall and diversity
             # Use larger multiplier to ensure enough candidates for multi-source filtering
             candidate_count = n_results * 5  # Increased from 3 to 5
+            if query_profile['single_source_focus']:
+                candidate_count = max(candidate_count, n_results * 8)
             
-            logger.info(f"Query: '{query[:50]}...' | Collections: {len(collection_names)} | "
+            logger.info(f"Query: '{query[:50]}...' | RetrievalQuery: '{retrieval_query[:80]}...' | Collections: {len(collection_names)} | "
                        f"n_results: {n_results} | candidate_count: {candidate_count} | "
-                       f"multi_source: {enable_multi_source}")
+                       f"multi_source: {enable_multi_source} | single_source_focus: {query_profile['single_source_focus']}")
             
             # ---- Step 1: Vector search ----
             vector_results = []
@@ -247,13 +258,28 @@ class RAGService:
             logger.info(f"Vector search returned {len(vector_results)} results")
             
             # ---- Step 2: BM25 search (if hybrid enabled) ----
+            title_results = []
+            for collection_name in collection_names:
+                if not self.vector_service.collection_exists(collection_name):
+                    continue
+                title_hits = self.bm25_retriever.search_title_matches(
+                    query=retrieval_query,
+                    collection_name=collection_name,
+                    vector_service=self.vector_service,
+                    n_results=candidate_count,
+                    terms=focus_terms
+                )
+                for hit in title_hits:
+                    hit['collection'] = collection_name
+                title_results.extend(title_hits)
+
             if enable_hybrid:
                 bm25_results = []
                 for collection_name in collection_names:
                     if not self.vector_service.collection_exists(collection_name):
                         continue
                     bm25_hits = self.bm25_retriever.search(
-                        query=query,
+                        query=retrieval_query,
                         collection_name=collection_name,
                         vector_service=self.vector_service,
                         n_results=candidate_count
@@ -263,15 +289,33 @@ class RAGService:
                     bm25_results.extend(bm25_hits)
                 
                 # ---- Step 3: RRF Fusion ----
-                if bm25_results:
+                if title_results and bm25_results:
+                    all_results = reciprocal_rank_fusion(
+                        [title_results, vector_results, bm25_results], k=60
+                    )
+                    logger.info(
+                        f"Hybrid+title search: {len(title_results)} title + {len(vector_results)} vector + {len(bm25_results)} BM25 -> {len(all_results)} fused"
+                    )
+                elif bm25_results:
                     all_results = reciprocal_rank_fusion(
                         [vector_results, bm25_results], k=60
                     )
                     logger.info(f"Hybrid search: {len(vector_results)} vector + {len(bm25_results)} BM25 -> {len(all_results)} fused")
+                elif title_results:
+                    all_results = reciprocal_rank_fusion(
+                        [title_results, vector_results], k=60
+                    )
+                    logger.info(f"Title+vector search: {len(title_results)} title + {len(vector_results)} vector -> {len(all_results)} fused")
                 else:
                     all_results = vector_results
             else:
-                all_results = vector_results
+                if title_results:
+                    all_results = reciprocal_rank_fusion(
+                        [title_results, vector_results], k=60
+                    )
+                    logger.info(f"Title+vector search: {len(title_results)} title + {len(vector_results)} vector -> {len(all_results)} fused")
+                else:
+                    all_results = vector_results
             
             # ---- Step 4: Multi-source diversity filtering ----
             if enable_multi_source and all_results:
@@ -288,6 +332,8 @@ class RAGService:
             if enable_rerank and all_results:
                 all_results = self._rerank_by_cosine(query_embedding, all_results)
                 logger.info(f"Reranked {len(all_results)} results by cosine similarity")
+
+            all_results = self._apply_metadata_boosts(all_results, query_profile)
             
             # ---- Step 6: Relevance threshold filtering ----
             if relevance_threshold > 0:
@@ -317,6 +363,115 @@ class RAGService:
         except Exception as e:
             logger.error(f"Query failed: {e}")
             return []
+
+    def _build_retrieval_query(self, query: str) -> str:
+        """Expand user query with heading-like/title-like terms for better retrieval."""
+        text = (query or '').strip()
+        if not text:
+            return text
+
+        extra_terms = []
+
+        for part in re.findall(r'\d+(?:\.\d+){1,3}\s*[^\n，。；;：:]{2,40}', text):
+            cleaned = part.strip()
+            if cleaned:
+                extra_terms.append(cleaned)
+
+        for part in re.findall(r'[（(]?\d+[)）]\s*[^\n，。；;：:]{1,20}', text):
+            cleaned = part.strip()
+            if cleaned:
+                extra_terms.append(cleaned)
+
+        for part in re.findall(r'[\u4e00-\u9fffA-Za-z0-9]+(?:的[\u4e00-\u9fffA-Za-z0-9]+){0,3}', text):
+            cleaned = part.strip()
+            if 3 <= len(cleaned) <= 24:
+                extra_terms.append(cleaned)
+
+        compact = text
+        compact = re.sub(r'^(请|帮我|分析|说明|解释|介绍)\s*', '', compact)
+        compact = re.sub(r'(是什么|怎么做|怎么办|如何分析|控制过程分析|工作原理分析)[？?]?\s*$', '', compact)
+        compact = compact.strip(' ，。；;：:')
+        if 2 <= len(compact) <= 32:
+            extra_terms.append(compact)
+
+        deduped = []
+        seen = set()
+        for item in [text, *extra_terms]:
+            item = item.strip()
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+
+        return '\n'.join(deduped)
+
+    def _build_query_profile(self, query: str) -> Dict[str, Any]:
+        retrieval_query = self._build_retrieval_query(query)
+        raw_terms = [item.strip() for item in retrieval_query.split('\n') if item.strip()]
+        normalized_terms = []
+        seen = set()
+        for term in raw_terms:
+            normalized = self._normalize_lookup_text(term)
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            normalized_terms.append(normalized)
+
+        single_source_focus = bool(
+            re.search(r'\d+(?:\.\d+){1,3}', query or '') or
+            any(keyword in (query or '') for keyword in ['控制过程分析', '工作原理分析', '起锚1挡', '起锚2挡', '起锚3挡'])
+        )
+
+        return {
+            'retrieval_query': retrieval_query,
+            'focus_terms': normalized_terms,
+            'single_source_focus': single_source_focus,
+        }
+
+    def _normalize_lookup_text(self, text: str) -> str:
+        if not text:
+            return ''
+        value = str(text).lower().strip()
+        value = re.sub(r'\s+', '', value)
+        value = re.sub(r'[，。；：、“”‘’（）()\[\]【】\-—_·,.!?？!/:]', '', value)
+        return value
+
+    def _apply_metadata_boosts(self, results: List[Dict[str, Any]], query_profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if not results:
+            return results
+
+        boosted = []
+        for result in results:
+            metadata = result.get('metadata', {}) or {}
+            section_title = self._normalize_lookup_text(metadata.get('section_title', ''))
+            section_path = self._normalize_lookup_text(metadata.get('section_path', ''))
+            file_name = self._normalize_lookup_text(metadata.get('file_name', ''))
+
+            bonus = 0.0
+            for term in query_profile.get('focus_terms', []):
+                if not term:
+                    continue
+                if section_title and term == section_title:
+                    bonus = max(bonus, 0.45)
+                elif section_title and (term in section_title or section_title in term):
+                    bonus = max(bonus, 0.28)
+                if section_path and term in section_path:
+                    bonus = max(bonus, 0.20)
+                if file_name and term in file_name:
+                    bonus = max(bonus, 0.16)
+
+            base_score = result.get('score')
+            if base_score is None:
+                distance = result.get('distance')
+                base_score = max(0.0, 1.0 - float(distance or 0.0))
+
+            normalized = dict(result)
+            normalized['score'] = float(base_score) + bonus
+            normalized['metadata_boost'] = bonus
+            boosted.append(normalized)
+
+        boosted.sort(key=lambda item: item.get('score', 0.0), reverse=True)
+        return boosted
     
     def _ensure_source_diversity(self, results: List[Dict[str, Any]], 
                                  max_per_file: int = 3,
