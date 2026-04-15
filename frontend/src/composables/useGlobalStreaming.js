@@ -265,12 +265,16 @@ export function useGlobalStreaming() {
    */
   function abortStream(conversationId) {
     const state = globalState.activeStreams.get(conversationId)
-    if (state && state.abortController) {
-      try {
-        state.abortController.abort()
-        state.isAborted = true
-      } catch (e) {
-        console.error('Error aborting stream:', e)
+    if (state) {
+      state.isStreaming = false
+      state.isAborted = true
+      state.status = '已终止'
+      if (state.abortController) {
+        try {
+          state.abortController.abort()
+        } catch (e) {
+          console.error('Error aborting stream:', e)
+        }
       }
     }
     globalState.streamingLocks.delete(conversationId)

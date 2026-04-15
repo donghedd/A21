@@ -1,13 +1,126 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
+  <div class="page-container" :class="{ 'detail-mode': adminShowingDetail }">
+    <div v-if="!adminShowingDetail" class="page-header">
       <div class="header-left">
         <h2 class="page-title">{{ adminMode ? '全局对话历史管理' : '对话历史管理' }}</h2>
       </div>
     </div>
 
     <section class="section">
-      <div class="panel-card">
+      <div class="panel-card" :class="{ 'history-admin-card': adminMode }">
+        <div
+          v-if="adminMode"
+          class="history-admin-shell"
+          :class="{
+            'detail-only': adminShowingDetail,
+            'manage-only': !adminShowingDetail
+          }"
+        >
+          <div v-if="!adminShowingDetail" class="history-admin-left">
+            <div class="users-toolbar history-toolbar">
+              <el-input
+                v-model="filters.keyword"
+                clearable
+                :placeholder="adminMode ? '按标题或消息关键词搜索' : '按标题搜索历史对话'"
+                class="users-search"
+                @keyup.enter="applyFilters"
+              />
+              <el-input
+                v-if="adminMode"
+                v-model="filters.username"
+                clearable
+                placeholder="按成员搜索"
+                class="history-member-input"
+                @keyup.enter="applyFilters"
+              />
+              <el-date-picker
+                v-model="filters.dateRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                value-format="YYYY-MM-DD"
+                class="history-date-range"
+              />
+              <el-button type="primary" @click="applyFilters">筛选</el-button>
+              <el-button @click="resetFilters">重置</el-button>
+              <el-button @click="loadConversationHistory">刷新</el-button>
+            </div>
+
+            <el-table
+              ref="historyTableRef"
+              :data="displayConversationHistory"
+              v-loading="loadingHistory"
+              stripe
+              class="custom-table"
+              row-key="id"
+              height="100%"
+              @selection-change="handleSelectionChange"
+              @row-click="(row) => openConversationDetail(row.id)"
+            >
+              <el-table-column type="selection" width="48" :reserve-selection="true" />
+              <el-table-column prop="title" label="对话标题" min-width="220" show-overflow-tooltip />
+              <el-table-column prop="username" label="成员" min-width="120" show-overflow-tooltip />
+              <el-table-column label="更新时间" min-width="180">
+                <template #default="{ row }">{{ formatDate(row.updated_at) }}</template>
+              </el-table-column>
+              <el-table-column label="消息数" width="90" align="center">
+                <template #default="{ row }">{{ row.message_count ?? '-' }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="240" fixed="right">
+                <template #default="{ row }">
+                  <div class="row-actions">
+                    <el-button size="small" link type="primary" @click.stop="openConversationDetail(row.id)">
+                      查看
+                    </el-button>
+                    <el-button size="small" link type="primary" @click.stop="exportHistoryMarkdown(row)">
+                      导出 Markdown
+                    </el-button>
+                    <el-button size="small" link type="danger" @click.stop="deleteConversation(row)">
+                      删除
+                    </el-button>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <el-pagination
+              v-if="pagination.total > pagination.per_page"
+              class="history-pagination"
+              background
+              layout="total, prev, pager, next"
+              :total="pagination.total"
+              :page-size="pagination.per_page"
+              :current-page="pagination.page"
+              @current-change="handlePageChange"
+            />
+          </div>
+
+          <div v-if="adminShowingDetail" class="history-admin-right detail-only-panel">
+            <div v-if="detailConversation.id || loadingDetail" class="history-chat-view">
+              <AiChat
+                :title="detailConversation.title || '未命名对话'"
+                :messages="detailDisplayMessages"
+                :is-streaming="false"
+                :show-welcome="false"
+                :show-model-selector="false"
+                :allow-speech="false"
+                :hide-input-area="true"
+                :readonly="true"
+                :title-editable="false"
+                :user-name="detailConversation.username || 'Admin'"
+                class="history-admin-chat"
+              />
+            </div>
+            <el-empty
+              v-else
+              description="未找到该对话记录"
+              :image-size="100"
+            />
+          </div>
+        </div>
+
+        <template v-else>
         <div class="users-toolbar history-toolbar">
           <el-input
             v-model="filters.keyword"
@@ -83,6 +196,7 @@
           :current-page="pagination.page"
           @current-change="handlePageChange"
         />
+        </template>
       </div>
     </section>
 
@@ -97,6 +211,7 @@
     </transition>
 
     <el-dialog
+      v-if="!adminMode"
       v-model="detailVisible"
       width="860px"
       destroy-on-close
@@ -148,6 +263,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as chatApi from '@/api/chat'
 import * as adminApi from '@/api/admin'
 import { exportAsMarkdown, exportMarkdownZip, formatConversationAsMarkdown } from '@/utils/export'
+import { AiChat } from '@/components/ai'
 
 const props = defineProps({
   adminMode: { type: Boolean, default: false },
@@ -179,6 +295,22 @@ const roleLabelMap = {
   assistant: '助手',
   system: '系统'
 }
+
+const adminShowingDetail = computed(() => props.adminMode && !!props.selectedConversationId)
+
+const detailDisplayMessages = computed(() => (
+  detailMessages.value.map(message => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    thinking: message.thinking_content || '',
+    thinkingDuration: message.thinking_duration || 0,
+    sources: message.sources || [],
+    loading: false,
+    interrupted: false,
+    created_at: message.created_at
+  }))
+))
 
 const filteredConversationHistory = computed(() => {
   if (props.adminMode) return conversationHistory.value
@@ -310,6 +442,7 @@ async function openConversationDetail(conversationId) {
       const res = await adminApi.getHistoryConversationDetail(conversationId)
       detailConversation.value = res.data?.conversation || {}
       detailMessages.value = res.data?.messages || []
+      detailVisible.value = false
     } else {
       const res = await chatApi.getConversation(conversationId)
       detailConversation.value = {
@@ -462,7 +595,14 @@ watch(
 watch(
   () => props.selectedConversationId,
   async (conversationId) => {
-    if (!props.adminMode || !conversationId || loadingHistory.value) return
+    if (!props.adminMode) return
+    if (!conversationId) {
+      detailConversation.value = {}
+      detailMessages.value = []
+      loadingDetail.value = false
+      return
+    }
+    if (loadingHistory.value) return
     await nextTick()
     openConversationDetail(conversationId)
   },
@@ -508,12 +648,88 @@ watch(
   margin-bottom: 32px;
 }
 
+.page-container.detail-mode {
+  padding-top: 12px;
+}
+
 .panel-card {
   background: #FFFFFF;
   border-radius: 16px;
   padding: 24px;
   border: 1px solid rgba(99, 102, 241, 0.1);
   box-shadow: 0 2px 12px rgba(79, 70, 229, 0.04);
+}
+
+.history-admin-card {
+  padding: 18px;
+  height: calc(100vh - 170px);
+  min-height: 620px;
+  overflow: hidden;
+}
+
+.history-admin-shell {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.1fr) minmax(420px, 1fr);
+  gap: 18px;
+  height: 100%;
+}
+
+.history-admin-shell.manage-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.history-admin-shell.detail-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.history-admin-left,
+.history-admin-right {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-admin-left {
+  overflow: hidden;
+}
+
+.history-admin-right {
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.detail-only-panel {
+  min-width: 0;
+}
+
+.history-chat-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.history-admin-chat {
+  flex: 1;
+  min-height: 0;
+  border-radius: 0;
+
+  :deep(.ai-chat-container) {
+    background: transparent;
+  }
+
+  :deep(.ai-chat-header) {
+    border-radius: 0;
+    padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.82);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+  }
+
+  :deep(.ai-chat-messages) {
+    padding: 16px 12px 18px;
+  }
 }
 
 .users-toolbar {

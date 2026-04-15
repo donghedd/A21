@@ -38,8 +38,8 @@
             </div>
             <div
               class="sidebar-item"
-              :class="{ active: activeTab === 'history' }"
-              @click="activeTab = 'history'"
+              :class="{ active: activeTab === 'history' && !selectedHistoryConversationId }"
+              @click="openHistoryManage()"
             >
               <el-icon><Document /></el-icon>
               <span>对话历史管理</span>
@@ -593,6 +593,11 @@ async function selectConversation(id) {
   selectedHistoryConversationId.value = ''
   await nextTick()
   selectedHistoryConversationId.value = id
+  activeTab.value = 'history'
+}
+
+function openHistoryManage() {
+  selectedHistoryConversationId.value = ''
   activeTab.value = 'history'
 }
 

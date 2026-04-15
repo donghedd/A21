@@ -169,7 +169,7 @@
                 :interrupted="item.interrupted"
                 @source-click="handleSourceClick"
               />
-              <div v-if="!isEditingMessage(item)" class="message-actions-inline">
+              <div v-if="!props.readonly && !isEditingMessage(item)" class="message-actions-inline">
                 <el-tooltip content="复制" placement="bottom">
                   <el-button link size="small" @click="copyMessage(item.content)">
                     <el-icon><DocumentCopy /></el-icon>
@@ -200,7 +200,7 @@
     </div>
     
     <!-- 输入区域 -->
-    <div class="ai-chat-input">
+    <div v-if="!hideInputArea" class="ai-chat-input">
       <slot name="input">
         <div class="custom-sender">
           <div class="sender-wrapper">
@@ -303,6 +303,8 @@ const props = defineProps({
   // 输入配置
   inputPlaceholder: { type: String, default: '输入您的问题...' },
   inputDisabled: { type: Boolean, default: false },
+  hideInputArea: { type: Boolean, default: false },
+  readonly: { type: Boolean, default: false },
   allowSpeech: { type: Boolean, default: true },
   speechLoading: { type: Boolean, default: false },
   editingMessageId: { type: String, default: null },
@@ -451,6 +453,9 @@ function handleSend() {
       model: selectedModel.value
     })
     inputMessage.value = ''
+    nextTick(() => {
+      scrollToBottomSafe(true)
+    })
   }
 }
 
@@ -461,6 +466,9 @@ function handleStop() {
 function handlePromptClick(prompt) {
   emit('prompt-click', prompt)
   inputMessage.value = prompt.content || prompt.label
+  nextTick(() => {
+    scrollToBottomSafe(true)
+  })
 }
 
 function handleMessageAction(action, item) {
